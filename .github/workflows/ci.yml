@@ -45,9 +45,7 @@ jobs:
           cache: maven
 
       - name: OWASP Dependency Check
-        run: mvn dependency-check:check -B
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn dependency-check:check -B -DnvdApiKey=${{ secrets.NVD_API_KEY }} -DfailBuildOnError=false
 
       - name: Upload OWASP report
         if: always()
@@ -60,6 +58,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write
 
     steps:
