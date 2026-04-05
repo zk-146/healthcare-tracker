@@ -232,7 +232,6 @@
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                     <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
-                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
                 </configuration>
             </plugin>
         </plugins>
