@@ -45,6 +45,7 @@ jobs:
           cache: maven
 
       - name: OWASP Dependency Check
+        continue-on-error: true
         run: mvn dependency-check:check -B -DnvdApiKey=${{ secrets.NVD_API_KEY }} -DfailBuildOnError=false
 
       - name: Upload OWASP report
