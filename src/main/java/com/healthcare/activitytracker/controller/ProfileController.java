@@ -22,6 +22,7 @@ public class ProfileController {
     this.profileService = profileService;
   }
 
+  /** Returns the authenticated user's profile. */
   @Operation(summary = "Get the current user's profile")
   @GetMapping
   public ResponseEntity<ProfileResponse> getProfile(Authentication auth) {
@@ -29,6 +30,7 @@ public class ProfileController {
     return ResponseEntity.ok(profileService.getProfile(userId));
   }
 
+  /** Partially updates the authenticated user's profile. Null fields in the request are ignored. */
   @Operation(summary = "Update the current user's profile")
   @PutMapping
   public ResponseEntity<ProfileResponse> updateProfile(

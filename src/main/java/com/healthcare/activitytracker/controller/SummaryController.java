@@ -28,6 +28,11 @@ public class SummaryController {
     this.summaryService = summaryService;
   }
 
+  /**
+   * Returns aggregated activity statistics for the specified date range. The optional {@code
+   * X-User-Timezone} header (e.g. {@code America/New_York}) is used for streak boundary
+   * calculations; defaults to UTC if absent or unrecognized.
+   */
   @Operation(summary = "Get activity summary for a custom date range")
   @GetMapping
   public ResponseEntity<SummaryResponse> getSummary(
@@ -40,6 +45,7 @@ public class SummaryController {
     return ResponseEntity.ok(summaryService.getSummary(userId, from, to, zone));
   }
 
+  /** Returns today's activity summary in the user's local timezone. */
   @Operation(summary = "Get today's activity summary")
   @GetMapping("/daily")
   public ResponseEntity<SummaryResponse> getDaily(
@@ -49,6 +55,9 @@ public class SummaryController {
     return ResponseEntity.ok(summaryService.getDailySummary(userId, resolveZone(timezone)));
   }
 
+  /**
+   * Returns a week-to-date activity summary (Monday through today) in the user's local timezone.
+   */
   @Operation(summary = "Get week-to-date activity summary")
   @GetMapping("/weekly")
   public ResponseEntity<SummaryResponse> getWeekly(
@@ -58,6 +67,7 @@ public class SummaryController {
     return ResponseEntity.ok(summaryService.getWeeklySummary(userId, resolveZone(timezone)));
   }
 
+  /** Returns a month-to-date activity summary (1st through today) in the user's local timezone. */
   @Operation(summary = "Get month-to-date activity summary")
   @GetMapping("/monthly")
   public ResponseEntity<SummaryResponse> getMonthly(

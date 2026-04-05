@@ -64,7 +64,10 @@ class SummaryServiceTest {
     when(activityRepository.sumDistanceAndSteps(eq(userId), any(), any()))
         .thenReturn(List.of(distSteps));
     when(activityRepository.findDistinctActiveDatesByUserId(eq(userId), any()))
-        .thenReturn(List.of(LocalDate.now(), LocalDate.now().minusDays(1)));
+        .thenReturn(
+            List.of(
+                LocalDate.now(java.time.ZoneId.of("UTC")),
+                LocalDate.now(java.time.ZoneId.of("UTC")).minusDays(1)));
 
     SummaryResponse summary =
         summaryService.getSummary(
