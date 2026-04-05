@@ -18,6 +18,9 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
 
+  // Authorization and other sensitive headers are intentionally excluded from all log statements
+  // to comply with HIPAA and healthcare data handling requirements.
+
   @Override
   protected void doFilterInternal(
       @NonNull HttpServletRequest request,
