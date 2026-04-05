@@ -29,6 +29,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
       # If Redis is unavailable, the app falls back to in-memory stores.
       # Set timeout low so startup isn't blocked.
       timeout: 2000ms
