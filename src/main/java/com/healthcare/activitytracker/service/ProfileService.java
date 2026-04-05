@@ -1,0 +1,60 @@
+package com.healthcare.activitytracker.service;
+
+import com.healthcare.activitytracker.exception.ResourceNotFoundException;
+import com.healthcare.activitytracker.model.dto.ProfileResponse;
+import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
+import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.repository.UserRepository;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProfileService {
+
+  private final UserRepository userRepository;
+
+  public ProfileService(UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
+
+  @Transactional(readOnly = true)
+  public ProfileResponse getProfile(UUID userId) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    return toResponse(user);
+  }
+
+  @Transactional
+  public ProfileResponse updateProfile(UUID userId, ProfileUpdateRequest request) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    if (request.getFullName() != null) user.setFullName(request.getFullName());
+    if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
+    if (request.getGender() != null) user.setGender(request.getGender());
+    if (request.getHeightCm() != null) user.setHeightCm(request.getHeightCm());
+    if (request.getWeightKg() != null) user.setWeightKg(request.getWeightKg());
+
+    user = userRepository.save(user);
+    return toResponse(user);
+  }
+
+  private ProfileResponse toResponse(User user) {
+    return ProfileResponse.builder()
+        .id(user.getId())
+        .email(user.getEmail())
+        .fullName(user.getFullName())
+        .dateOfBirth(user.getDateOfBirth())
+        .gender(user.getGender())
+        .heightCm(user.getHeightCm())
+        .weightKg(user.getWeightKg())
+        .createdAt(user.getCreatedAt())
+        .updatedAt(user.getUpdatedAt())
+        .build();
+  }
+}

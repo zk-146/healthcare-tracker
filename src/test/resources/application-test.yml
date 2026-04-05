@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false
+
+  # Disable Redis in tests — the app will fall back to in-memory stores
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+# Disable springdoc in tests — WebMvcTest slices cannot satisfy all springdoc dependencies
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    secret: test-secret-key-for-unit-tests-must-be-at-least-32-chars
+    refresh-secret: test-refresh-secret-key-for-tests-must-be-at-least-32-chars
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+    issuer: activity-tracker
+    audience: activity-tracker-users
+  cors:
+    allowed-origins: http://localhost:3000
+  rate-limit:
+    auth-requests-per-minute: 100
+    api-requests-per-minute: 1000

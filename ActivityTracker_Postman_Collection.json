@@ -1,0 +1,3237 @@
+{
+  "info": {
+    "name": "Activity Tracker API — Full Coverage",
+    "description": "Comprehensive Postman collection for the Activity Tracker Spring Boot API.\n\nCovers all endpoints with happy-path, validation, authorization, edge-case, and concurrency tests.\n\n## Setup\n1. Start the backend (`docker-compose up` or `mvn spring-boot:run`)\n2. Import this collection and the environment file\n3. Run the **Auth > Register** request first — tokens auto-populate\n4. Run folders top-to-bottom for best results\n\n## Variables\n- `baseUrl` — API root (default: http://localhost:8080)\n- `accessToken` / `refreshToken` — auto-set by auth requests\n- `userId` — auto-set on register/login\n- `activityId` — auto-set on activity creation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "activityId", "value": "", "type": "string" },
+    { "key": "secondAccessToken", "value": "", "type": "string" },
+    { "key": "secondRefreshToken", "value": "", "type": "string" },
+    { "key": "secondUserId", "value": "", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "revokedToken", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth — Registration",
+      "item": [
+        {
+          "name": "Register — Happy Path",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const uniqueEmail = 'testuser_' + Date.now() + '@example.com';",
+                  "pm.collectionVariables.set('testEmail', uniqueEmail);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Response has token fields', () => {",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.expect(json).to.have.property('refreshToken');",
+                  "    pm.expect(json).to.have.property('expiresIn');",
+                  "    pm.expect(json).to.have.property('userId');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "});",
+                  "",
+                  "pm.test('expiresIn is positive number', () => {",
+                  "    pm.expect(json.expiresIn).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('email matches registration email', () => {",
+                  "    pm.expect(json.email).to.eql(pm.collectionVariables.get('testEmail'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', json.token);",
+                  "pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "pm.collectionVariables.set('userId', json.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"Test User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Duplicate Email (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409 Conflict', () => pm.response.to.have.status(409));",
+                  "",
+                  "pm.test('Error body has error field', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"Duplicate User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Missing Email (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions email', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasEmail = json.details && json.details.email;",
+                  "    pm.expect(hasEmail).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"No Email User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Invalid Email Format (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions email', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasEmail = json.details && json.details.email;",
+                  "    pm.expect(hasEmail).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"Bad Email User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Missing Full Name (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions fullName', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasField = json.details && json.details.fullName;",
+                  "    pm.expect(hasField).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"noname@example.com\",\n  \"password\": \"SecurePass1!xyz\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Weak Password No Uppercase (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions password', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasField = json.details && json.details.password;",
+                  "    pm.expect(hasField).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weakpw1@example.com\",\n  \"password\": \"nouppercase1!ab\",\n  \"fullName\": \"Weak PW\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Weak Password No Digit (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions password', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasField = json.details && json.details.password;",
+                  "    pm.expect(hasField).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weakpw2@example.com\",\n  \"password\": \"NoDigitHere!abc\",\n  \"fullName\": \"Weak PW\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Weak Password No Special Char (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions password', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasField = json.details && json.details.password;",
+                  "    pm.expect(hasField).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weakpw3@example.com\",\n  \"password\": \"NoSpecialChar1ab\",\n  \"fullName\": \"Weak PW\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Password Too Short (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions password', () => {",
+                  "    const json = pm.response.json();",
+                  "    const hasField = json.details && json.details.password;",
+                  "    pm.expect(hasField).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weakpw4@example.com\",\n  \"password\": \"Short1!a\",\n  \"fullName\": \"Weak PW\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Empty Body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Malformed JSON (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions malformed body', () => {",
+                  "    pm.expect(pm.response.json().error).to.include('alformed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{not json" },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — Email Case Normalization",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const uniqueEmail = 'CaseTest_' + Date.now() + '@Example.COM';",
+                  "pm.collectionVariables.set('caseTestEmail', uniqueEmail);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Email is normalized to lowercase', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.email).to.eql(pm.collectionVariables.get('caseTestEmail').toLowerCase());",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{caseTestEmail}}\",\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"Case Test\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register — fullName Max Length 150 Boundary",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('longName', 'A'.repeat(151));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 for 151-char name', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"longname@example.com\",\n  \"password\": \"SecurePass1!xyz\",\n  \"fullName\": \"{{longName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — Login",
+      "item": [
+        {
+          "name": "Login — Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Response has all token fields', () => {",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.expect(json).to.have.property('refreshToken');",
+                  "    pm.expect(json).to.have.property('expiresIn');",
+                  "    pm.expect(json).to.have.property('userId');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', json.token);",
+                  "pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "pm.collectionVariables.set('userId', json.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"SecurePass1!xyz\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Login — Wrong Password (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error message present', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"WrongPassword1!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Login — Non-Existent Email (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nonexistent@example.com\",\n  \"password\": \"SecurePass1!xyz\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Login — Missing Email (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"SecurePass1!xyz\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Login — Missing Password (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Login — Empty Body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — Refresh Token",
+      "item": [
+        {
+          "name": "Refresh — Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('New tokens issued', () => {",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.expect(json.refreshToken).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('New access token differs from old', () => {",
+                  "    pm.expect(json.token).to.not.eql(pm.collectionVariables.get('accessToken'));",
+                  "});",
+                  "",
+                  "// Save old refresh token to test replay",
+                  "pm.collectionVariables.set('revokedToken', pm.collectionVariables.get('refreshToken'));",
+                  "pm.collectionVariables.set('accessToken', json.token);",
+                  "pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Refresh — Replay Used Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 — replay blocked', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{revokedToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Refresh — Garbage Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"not.a.valid.jwt.token\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Refresh — Missing Token (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Refresh — Access Token Used As Refresh (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 — wrong token type', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{accessToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — Logout",
+      "item": [
+        {
+          "name": "Logout — Happy Path (204)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Store current token to test post-logout rejection",
+                  "pm.collectionVariables.set('loggedOutToken', pm.collectionVariables.get('accessToken'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        },
+        {
+          "name": "Use Logged-Out Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 — token revoked', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{loggedOutToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Logout — No Token (204, no-op)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 — graceful no-op', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        },
+        {
+          "name": "Re-Login After Logout (for remaining tests)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', json.token);",
+                  "pm.collectionVariables.set('refreshToken', json.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"SecurePass1!xyz\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — Edge Cases",
+      "item": [
+        {
+          "name": "Protected Endpoint Without Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Protected Endpoint With Garbage Bearer (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer garbage.token.here" }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Protected Endpoint With Refresh Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 — refresh token not accepted as access', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{refreshToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Actuator Health — Permitted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status UP', () => {",
+                  "    pm.expect(pm.response.json().status).to.eql('UP');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "Actuator Info — Denied (401 or 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Actuator info is blocked', () => {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/actuator/info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Profile — Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Profile has expected fields', () => {",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('fullName');",
+                  "    pm.expect(json).to.have.property('createdAt');",
+                  "});",
+                  "",
+                  "pm.test('fullName matches registration', () => {",
+                  "    pm.expect(json.fullName).to.eql('Test User');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — Full Update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Fields updated correctly', () => {",
+                  "    pm.expect(json.fullName).to.eql('Updated Name');",
+                  "    pm.expect(json.gender).to.eql('Male');",
+                  "    pm.expect(json.heightCm).to.eql(180.5);",
+                  "    pm.expect(json.weightKg).to.eql(75.0);",
+                  "    pm.expect(json.dateOfBirth).to.eql('1990-05-15');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Updated Name\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"Male\",\n  \"heightCm\": 180.5,\n  \"weightKg\": 75.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — Partial Update (only fullName)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('fullName changed', () => pm.expect(json.fullName).to.eql('Partial Update'));",
+                  "pm.test('Other fields preserved', () => {",
+                  "    pm.expect(json.gender).to.eql('Male');",
+                  "    pm.expect(json.heightCm).to.eql(180.5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Partial Update\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — Future DOB (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dateOfBirth\": \"2099-01-01\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — heightCm Out Of Range (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 500.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — weightKg Out Of Range (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 800.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — gender Too Long (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('longGender', 'A'.repeat(21));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gender\": \"{{longGender}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update Profile — Empty Body (200, no-op)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 — no fields changed', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities — Create",
+      "item": [
+        {
+          "name": "Create MANUAL Walking — Minimal Fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Has id and timestamps', () => {",
+                  "    pm.expect(json.id).to.be.a('string');",
+                  "    pm.expect(json.createdAt).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Type and source match', () => {",
+                  "    pm.expect(json.activityType).to.eql('WALKING');",
+                  "    pm.expect(json.source).to.eql('MANUAL');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('activityId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create RUNNING — All Fields Populated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('All fields present', () => {",
+                  "    pm.expect(json.activityType).to.eql('RUNNING');",
+                  "    pm.expect(json.durationMinutes).to.eql(60);",
+                  "    pm.expect(json.distanceKm).to.eql(10.5);",
+                  "    pm.expect(json.caloriesBurned).to.eql(750.0);",
+                  "    pm.expect(json.heartRateAvg).to.eql(155);",
+                  "    pm.expect(json.steps).to.eql(12000);",
+                  "    pm.expect(json.notes).to.eql('Morning run in the park');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T06:00:00\",\n  \"endedAt\": \"2025-06-15T07:00:00\",\n  \"durationMinutes\": 60,\n  \"distanceKm\": 10.5,\n  \"caloriesBurned\": 750.0,\n  \"heartRateAvg\": 155,\n  \"steps\": 12000,\n  \"notes\": \"Morning run in the park\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create IOT Activity With DeviceId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Source is IOT with deviceId', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.source).to.eql('IOT');",
+                  "    pm.expect(json.deviceId).to.eql('fitbit-abc-123');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"CYCLING\",\n  \"source\": \"IOT\",\n  \"deviceId\": \"fitbit-abc-123\",\n  \"startedAt\": \"2025-06-14T10:00:00\",\n  \"endedAt\": \"2025-06-14T11:30:00\",\n  \"durationMinutes\": 90,\n  \"distanceKm\": 25.0,\n  \"caloriesBurned\": 600.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create IOT Activity — Missing DeviceId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions deviceId', () => {",
+                  "    const json = pm.response.json();",
+                  "    const errStr = JSON.stringify(json);",
+                  "    pm.expect(errStr.toLowerCase()).to.include('deviceid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"SWIMMING\",\n  \"source\": \"IOT\",\n  \"startedAt\": \"2025-06-14T10:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Missing activityType (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Missing source (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Missing startedAt (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Invalid activityType Enum (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"FLYING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Invalid source Enum (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"BLUETOOTH\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — endedAt Before startedAt (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T10:00:00\",\n  \"endedAt\": \"2025-06-15T09:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Duration Inconsistent With Times (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 — duration mismatch', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"endedAt\": \"2025-06-15T09:00:00\",\n  \"durationMinutes\": 300\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Duration Within Tolerance (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 — within 60min tolerance', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"endedAt\": \"2025-06-15T09:00:00\",\n  \"durationMinutes\": 90\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — distanceKm Exceeds 1000 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"CYCLING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"distanceKm\": 1001.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — caloriesBurned Exceeds 10000 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"caloriesBurned\": 10001.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — heartRateAvg Out Of Range (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"heartRateAvg\": 350\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — steps Exceeds 100000 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"steps\": 100001\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — durationMinutes Exceeds 1440 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"durationMinutes\": 1500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — notes Exceeds 1000 chars (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('longNotes', 'A'.repeat(1001));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"notes\": \"{{longNotes}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Zero distanceKm (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 — distance must be > 0', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"distanceKm\": 0.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — All Activity Types",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('STRENGTH_TRAINING type', () => {",
+                  "    pm.expect(pm.response.json().activityType).to.eql('STRENGTH_TRAINING');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"STRENGTH_TRAINING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-13T08:00:00\",\n  \"durationMinutes\": 45,\n  \"caloriesBurned\": 300.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create STRETCHING Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('STRETCHING type', () => {",
+                  "    pm.expect(pm.response.json().activityType).to.eql('STRETCHING');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"STRETCHING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-12T07:00:00\",\n  \"durationMinutes\": 20\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create OTHER Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('OTHER type', () => {",
+                  "    pm.expect(pm.response.json().activityType).to.eql('OTHER');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"OTHER\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-11T09:00:00\",\n  \"durationMinutes\": 30,\n  \"notes\": \"Rock climbing\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create SWIMMING Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"SWIMMING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-10T06:00:00\",\n  \"endedAt\": \"2025-06-10T07:00:00\",\n  \"durationMinutes\": 60,\n  \"distanceKm\": 2.0,\n  \"caloriesBurned\": 500.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create YOGA Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-09T18:00:00\",\n  \"durationMinutes\": 75,\n  \"caloriesBurned\": 200.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Create — Empty Body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities — Read",
+      "item": [
+        {
+          "name": "Get Activity By ID — Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct activity returned', () => {",
+                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('activityId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Get Activity — Non-Existent ID (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "Get Activity — Invalid UUID Format (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 or 500', () => {",
+                  "    pm.expect([400, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/not-a-uuid"
+          }
+        },
+        {
+          "name": "List Activities — Default Pagination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Page structure present', () => {",
+                  "    pm.expect(json).to.have.property('content');",
+                  "    pm.expect(json).to.have.property('totalElements');",
+                  "    pm.expect(json).to.have.property('totalPages');",
+                  "    pm.expect(json).to.have.property('size');",
+                  "    pm.expect(json).to.have.property('number');",
+                  "});",
+                  "",
+                  "pm.test('Default page size ≤ 20', () => {",
+                  "    pm.expect(json.size).to.be.at.most(20);",
+                  "});",
+                  "",
+                  "pm.test('Content is array', () => {",
+                  "    pm.expect(json.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "List Activities — Custom Page Size",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Page size is 5', () => {",
+                  "    pm.expect(pm.response.json().size).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?page=0&size=5"
+          }
+        },
+        {
+          "name": "List Activities — Page Size Capped At 100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Page size capped at 100', () => {",
+                  "    pm.expect(pm.response.json().size).to.be.at.most(100);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?size=500"
+          }
+        },
+        {
+          "name": "List Activities — Filter by activityType",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results are RUNNING', () => {",
+                  "    const items = pm.response.json().content;",
+                  "    items.forEach(item => pm.expect(item.activityType).to.eql('RUNNING'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?activityType=RUNNING"
+          }
+        },
+        {
+          "name": "List Activities — Filter by source",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results are IOT', () => {",
+                  "    const items = pm.response.json().content;",
+                  "    items.forEach(item => pm.expect(item.source).to.eql('IOT'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?source=IOT"
+          }
+        },
+        {
+          "name": "List Activities — Filter by Date Range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Results within date range', () => {",
+                  "    const items = pm.response.json().content;",
+                  "    items.forEach(item => {",
+                  "        const date = new Date(item.startedAt);",
+                  "        pm.expect(date >= new Date('2025-06-10')).to.be.true;",
+                  "        pm.expect(date <= new Date('2025-06-16')).to.be.true;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?from=2025-06-10&to=2025-06-15"
+          }
+        },
+        {
+          "name": "List Activities — Combined Filters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All WALKING + MANUAL', () => {",
+                  "    const items = pm.response.json().content;",
+                  "    items.forEach(item => {",
+                  "        pm.expect(item.activityType).to.eql('WALKING');",
+                  "        pm.expect(item.source).to.eql('MANUAL');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?activityType=WALKING&source=MANUAL&from=2025-01-01&to=2025-12-31"
+          }
+        },
+        {
+          "name": "List Activities — Page Beyond Data (empty content)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Content is empty', () => {",
+                  "    pm.expect(pm.response.json().content).to.be.an('array').that.is.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities?page=9999"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities — Update",
+      "item": [
+        {
+          "name": "Update Activity — Happy Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Fields updated', () => {",
+                  "    pm.expect(json.activityType).to.eql('RUNNING');",
+                  "    pm.expect(json.durationMinutes).to.eql(45);",
+                  "    pm.expect(json.notes).to.eql('Updated to running');",
+                  "});",
+                  "",
+                  "pm.test('updatedAt changed', () => {",
+                  "    pm.expect(json.updatedAt).to.not.eql(json.createdAt);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"durationMinutes\": 45,\n  \"notes\": \"Updated to running\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Update — Non-Existent Activity (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "Update — Validation Error endedAt < startedAt (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T10:00:00\",\n  \"endedAt\": \"2025-06-15T09:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities — Delete",
+      "item": [
+        {
+          "name": "Delete Activity — Happy Path (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Delete — Already Deleted / Non-Existent (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Get Deleted Activity (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 — confirmed deletion', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Summary",
+      "item": [
+        {
+          "name": "Setup — Create Activities For Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-01T08:00:00\",\n  \"durationMinutes\": 30,\n  \"distanceKm\": 2.5,\n  \"caloriesBurned\": 150.0,\n  \"steps\": 3500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Summary — Custom Date Range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Summary has all aggregate fields', () => {",
+                  "    pm.expect(json).to.have.property('from');",
+                  "    pm.expect(json).to.have.property('to');",
+                  "    pm.expect(json).to.have.property('totalActivities');",
+                  "    pm.expect(json).to.have.property('totalDurationMinutes');",
+                  "    pm.expect(json).to.have.property('totalCaloriesBurned');",
+                  "    pm.expect(json).to.have.property('totalDistanceKm');",
+                  "    pm.expect(json).to.have.property('totalSteps');",
+                  "    pm.expect(json).to.have.property('streakDays');",
+                  "    pm.expect(json).to.have.property('averageDailyCalories');",
+                  "    pm.expect(json).to.have.property('bySource');",
+                  "    pm.expect(json).to.have.property('byActivityType');",
+                  "});",
+                  "",
+                  "pm.test('totalActivities is positive', () => {",
+                  "    pm.expect(json.totalActivities).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('bySource is object', () => {",
+                  "    pm.expect(json.bySource).to.be.an('object');",
+                  "});",
+                  "",
+                  "pm.test('byActivityType is array', () => {",
+                  "    pm.expect(json.byActivityType).to.be.an('array');",
+                  "    if (json.byActivityType.length > 0) {",
+                  "        const first = json.byActivityType[0];",
+                  "        pm.expect(first).to.have.property('type');",
+                  "        pm.expect(first).to.have.property('count');",
+                  "        pm.expect(first).to.have.property('totalMinutes');",
+                  "        pm.expect(first).to.have.property('totalCalories');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2025-01-01&to=2025-12-31"
+          }
+        },
+        {
+          "name": "Summary — Daily",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('from equals to (single day)', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.from).to.eql(json.to);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/daily"
+          }
+        },
+        {
+          "name": "Summary — Weekly",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Range is ≤ 7 days', () => {",
+                  "    const json = pm.response.json();",
+                  "    const from = new Date(json.from);",
+                  "    const to = new Date(json.to);",
+                  "    const days = (to - from) / (1000 * 60 * 60 * 24);",
+                  "    pm.expect(days).to.be.at.most(7);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/weekly"
+          }
+        },
+        {
+          "name": "Summary — Monthly",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Range is ≤ 31 days', () => {",
+                  "    const json = pm.response.json();",
+                  "    const from = new Date(json.from);",
+                  "    const to = new Date(json.to);",
+                  "    const days = (to - from) / (1000 * 60 * 60 * 24);",
+                  "    pm.expect(days).to.be.at.most(31);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/monthly"
+          }
+        },
+        {
+          "name": "Summary — With Timezone Header",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-Timezone", "value": "America/New_York" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/daily"
+          }
+        },
+        {
+          "name": "Summary — Missing from Param (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?to=2025-12-31"
+          }
+        },
+        {
+          "name": "Summary — Missing to Param (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2025-01-01"
+          }
+        },
+        {
+          "name": "Summary — from After to (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2025-12-31&to=2025-01-01"
+          }
+        },
+        {
+          "name": "Summary — Range Exceeds 365 Days (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2023-01-01&to=2025-12-31"
+          }
+        },
+        {
+          "name": "Summary — Single Day Range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('from equals to', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.from).to.eql(json.to);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2025-06-15&to=2025-06-15"
+          }
+        },
+        {
+          "name": "Summary — Exactly 365 Days (boundary)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 — boundary accepted', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2024-06-16&to=2025-06-15"
+          }
+        },
+        {
+          "name": "Summary — No Activities In Range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Zero totals', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.totalActivities).to.eql(0);",
+                  "    pm.expect(json.totalDurationMinutes).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2020-01-01&to=2020-01-31"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cross-User Isolation",
+      "item": [
+        {
+          "name": "Register Second User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('secondEmail', 'user2_' + Date.now() + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('secondAccessToken', json.token);",
+                  "pm.collectionVariables.set('secondRefreshToken', json.refreshToken);",
+                  "pm.collectionVariables.set('secondUserId', json.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{secondEmail}}\",\n  \"password\": \"SecurePass2!xyz\",\n  \"fullName\": \"Second User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Create Activity As User 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('user1ActivityId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\",\n  \"notes\": \"User 1 private activity\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "User 2 Cannot Read User 1 Activity (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 — user isolation enforced', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{user1ActivityId}}"
+          }
+        },
+        {
+          "name": "User 2 Cannot Update User 1 Activity (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 — cross-user update blocked', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-15T08:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/{{user1ActivityId}}"
+          }
+        },
+        {
+          "name": "User 2 Cannot Delete User 1 Activity (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 — cross-user delete blocked', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{user1ActivityId}}"
+          }
+        },
+        {
+          "name": "User 2 List Shows Only Their Activities",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No activities from User 1', () => {",
+                  "    const items = pm.response.json().content;",
+                  "    const user1Id = pm.collectionVariables.get('user1ActivityId');",
+                  "    items.forEach(item => pm.expect(item.id).to.not.eql(user1Id));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "User 2 Summary Does Not Include User 1 Data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No activities for new user', () => {",
+                  "    pm.expect(pm.response.json().totalActivities).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{secondAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2025-01-01&to=2025-12-31"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Response Format",
+      "item": [
+        {
+          "name": "Verify 400 Error Shape",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Error response has standard shape', () => {",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});",
+                  "",
+                  "pm.test('Timestamp is ISO format', () => {",
+                  "    const ts = new Date(json.timestamp);",
+                  "    pm.expect(ts.getTime()).to.not.be.NaN;",
+                  "});",
+                  "",
+                  "pm.test('Has details map for validation errors', () => {",
+                  "    pm.expect(json).to.have.property('details');",
+                  "    pm.expect(json.details).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Verify 404 Error Shape",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has error and timestamp', () => {",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/00000000-0000-0000-0000-000000000000"
+          }
+        },
+        {
+          "name": "Verify 401 Error Shape",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has error and timestamp', () => {",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"wrong@example.com\",\n  \"password\": \"WrongPassword1!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Malformed JSON Yields 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mentions malformed', () => {",
+                  "    pm.expect(pm.response.json().error.toLowerCase()).to.include('malformed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{ invalid json !!!" },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Boundary & Edge Cases",
+      "item": [
+        {
+          "name": "Boundary — distanceKm Exactly 1000 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 — boundary value accepted', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"CYCLING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-01T08:00:00\",\n  \"distanceKm\": 1000.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — caloriesBurned Exactly 10000 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-02T08:00:00\",\n  \"caloriesBurned\": 10000.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — heartRateAvg Exactly 300 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-03T08:00:00\",\n  \"heartRateAvg\": 300\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — heartRateAvg Exactly 1 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"YOGA\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-04T08:00:00\",\n  \"heartRateAvg\": 1\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — steps Exactly 100000 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-05T08:00:00\",\n  \"steps\": 100000\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — durationMinutes Exactly 1440 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"OTHER\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-06T00:00:00\",\n  \"durationMinutes\": 1440\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — durationMinutes Exactly 1 (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"STRETCHING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-07T08:00:00\",\n  \"durationMinutes\": 1\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — durationMinutes Zero (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-08T08:00:00\",\n  \"durationMinutes\": 0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — steps Zero (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 — steps must be >= 1', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-08T09:00:00\",\n  \"steps\": 0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — Negative distanceKm (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-08T10:00:00\",\n  \"distanceKm\": -5.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Boundary — Negative caloriesBurned (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2025-06-08T11:00:00\",\n  \"caloriesBurned\": -100.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "MANUAL Source With DeviceId (allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 — deviceId optional for MANUAL', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"deviceId\": \"optional-device\",\n  \"startedAt\": \"2025-06-08T12:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "IOT Source With Blank DeviceId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"CYCLING\",\n  \"source\": \"IOT\",\n  \"deviceId\": \"   \",\n  \"startedAt\": \"2025-06-08T13:00:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          }
+        },
+        {
+          "name": "Profile — heightCm Exactly 0.1 (201 boundary)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('heightCm is 0.1', () => pm.expect(pm.response.json().heightCm).to.eql(0.1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 0.1\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Profile — weightKg Exactly 700 (boundary)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('weightKg is 700', () => pm.expect(pm.response.json().weightKg).to.eql(700.0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 700.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        }
+      ]
+    }
+  ]
+}
