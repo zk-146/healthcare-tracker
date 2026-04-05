@@ -28,6 +28,18 @@ public class SummaryService {
     this.activityRepository = activityRepository;
   }
 
+  /**
+   * Returns aggregated activity statistics for the given date range. Aggregations include totals by
+   * source and activity type, overall distance/steps/calories, and the current streak.
+   *
+   * @param userId the authenticated user's ID
+   * @param from inclusive start date
+   * @param to inclusive end date
+   * @param zone the user's timezone, used for streak boundary calculations
+   * @return the aggregated summary
+   * @throws IllegalArgumentException if {@code from} is after {@code to}, or the range exceeds
+   *     {@code app.summary.max-range-days}
+   */
   @Transactional(readOnly = true)
   public SummaryResponse getSummary(UUID userId, LocalDate from, LocalDate to, ZoneId zone) {
     long rangeDays = ChronoUnit.DAYS.between(from, to);
@@ -115,17 +127,40 @@ public class SummaryService {
         .build();
   }
 
+  /**
+   * Returns today's activity summary in the user's local timezone.
+   *
+   * @param userId the authenticated user's ID
+   * @param zone the user's timezone
+   * @return today's aggregated summary
+   */
   public SummaryResponse getDailySummary(UUID userId, ZoneId zone) {
     LocalDate today = LocalDate.now(zone);
     return getSummary(userId, today, today, zone);
   }
 
+  /**
+   * Returns a week-to-date activity summary, from Monday of the current week through today, in the
+   * user's local timezone.
+   *
+   * @param userId the authenticated user's ID
+   * @param zone the user's timezone
+   * @return the current week's aggregated summary
+   */
   public SummaryResponse getWeeklySummary(UUID userId, ZoneId zone) {
     LocalDate today = LocalDate.now(zone);
     LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1);
     return getSummary(userId, weekStart, today, zone);
   }
 
+  /**
+   * Returns a month-to-date activity summary, from the first of the current month through today, in
+   * the user's local timezone.
+   *
+   * @param userId the authenticated user's ID
+   * @param zone the user's timezone
+   * @return the current month's aggregated summary
+   */
   public SummaryResponse getMonthlySummary(UUID userId, ZoneId zone) {
     LocalDate today = LocalDate.now(zone);
     LocalDate monthStart = today.withDayOfMonth(1);

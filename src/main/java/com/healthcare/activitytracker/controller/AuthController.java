@@ -25,6 +25,7 @@ public class AuthController {
     this.authService = authService;
   }
 
+  /** Registers a new user and returns access and refresh tokens. Returns 201 on success. */
   @Operation(summary = "Register a new user account")
   @PostMapping("/register")
   public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -32,6 +33,7 @@ public class AuthController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  /** Authenticates a user and returns access and refresh tokens. */
   @Operation(summary = "Authenticate and receive access + refresh tokens")
   @PostMapping("/login")
   public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
@@ -39,6 +41,7 @@ public class AuthController {
     return ResponseEntity.ok(response);
   }
 
+  /** Exchanges a valid refresh token for a new access token. The refresh token is rotated. */
   @Operation(summary = "Exchange a refresh token for a new access token")
   @PostMapping("/refresh")
   public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {

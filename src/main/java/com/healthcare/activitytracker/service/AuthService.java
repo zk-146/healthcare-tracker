@@ -51,6 +51,15 @@ public class AuthService {
     this.tokenBlacklistService = tokenBlacklistService;
   }
 
+  /**
+   * Registers a new user account. The email is normalized (stripped and lowercased) before
+   * persistence.
+   *
+   * @param request the registration details (email, password, full name)
+   * @return access and refresh tokens for the newly created user
+   * @throws com.healthcare.activitytracker.exception.ResourceConflictException if the email is
+   *     already registered
+   */
   @Transactional
   public AuthResponse register(RegisterRequest request) {
     // Normalize email to prevent duplicate accounts differing only by case/whitespace
@@ -73,6 +82,14 @@ public class AuthService {
     return buildAuthResponse(user);
   }
 
+  /**
+   * Authenticates a user by email and password.
+   *
+   * @param request the login credentials
+   * @return access and refresh tokens on successful authentication
+   * @throws com.healthcare.activitytracker.exception.UnauthorizedException if the email is not
+   *     found or the password does not match
+   */
   @Transactional
   public AuthResponse login(LoginRequest request) {
     String normalizedEmail = request.getEmail().strip().toLowerCase(Locale.ROOT);
@@ -91,6 +108,16 @@ public class AuthService {
     return buildAuthResponse(user);
   }
 
+  /**
+   * Issues a new access token in exchange for a valid, non-revoked refresh token. The supplied
+   * refresh token is revoked after use (rotation), and a new refresh token is issued alongside the
+   * new access token.
+   *
+   * @param refreshToken the raw refresh token JWT
+   * @return new access and refresh tokens
+   * @throws com.healthcare.activitytracker.exception.UnauthorizedException if the token is invalid,
+   *     expired, the wrong type, not found in the database, or already revoked
+   */
   @Transactional
   public AuthResponse refresh(String refreshToken) {
     if (!jwtUtil.isRefreshTokenValid(refreshToken)) {

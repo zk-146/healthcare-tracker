@@ -76,10 +76,10 @@ class SummaryControllerTest {
   }
 
   @Test
-  void getSummary_returns403_whenUnauthenticated() throws Exception {
+  void getSummary_returns401_whenUnauthenticated() throws Exception {
     mockMvc
         .perform(get("/api/v1/summary").param("from", "2024-01-01").param("to", "2024-01-31"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

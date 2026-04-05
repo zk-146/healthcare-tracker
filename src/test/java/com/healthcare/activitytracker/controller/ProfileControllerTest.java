@@ -69,8 +69,8 @@ class ProfileControllerTest {
   }
 
   @Test
-  void getProfile_returns403_whenUnauthenticated() throws Exception {
-    mockMvc.perform(get("/api/v1/profile")).andExpect(status().isForbidden());
+  void getProfile_returns401_whenUnauthenticated() throws Exception {
+    mockMvc.perform(get("/api/v1/profile")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -106,13 +106,13 @@ class ProfileControllerTest {
   }
 
   @Test
-  void updateProfile_returns403_whenUnauthenticated() throws Exception {
+  void updateProfile_returns401_whenUnauthenticated() throws Exception {
     mockMvc
         .perform(
             put("/api/v1/profile")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 }

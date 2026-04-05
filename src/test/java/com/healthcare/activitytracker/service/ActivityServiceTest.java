@@ -79,7 +79,7 @@ class ActivityServiceTest {
   @Test
   void createActivity_savesAndReturnsResponse() {
     when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
-    when(activityRepository.save(any(Activity.class)))
+    when(activityRepository.saveAndFlush(any(Activity.class)))
         .thenAnswer(
             inv -> {
               Activity a = inv.getArgument(0);

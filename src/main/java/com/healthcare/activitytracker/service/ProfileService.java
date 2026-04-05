@@ -18,6 +18,14 @@ public class ProfileService {
     this.userRepository = userRepository;
   }
 
+  /**
+   * Retrieves the profile for the given user.
+   *
+   * @param userId the authenticated user's ID
+   * @return the user's profile details
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
+   *     exist
+   */
   @Transactional(readOnly = true)
   public ProfileResponse getProfile(UUID userId) {
     User user =
@@ -27,6 +35,16 @@ public class ProfileService {
     return toResponse(user);
   }
 
+  /**
+   * Applies a partial update to the user's profile. Only non-null fields in the request are
+   * written; null fields are left unchanged.
+   *
+   * @param userId the authenticated user's ID
+   * @param request the profile fields to update
+   * @return the updated profile details
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
+   *     exist
+   */
   @Transactional
   public ProfileResponse updateProfile(UUID userId, ProfileUpdateRequest request) {
     User user =

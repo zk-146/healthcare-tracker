@@ -30,6 +30,7 @@ public class ActivityController {
     this.activityService = activityService;
   }
 
+  /** Logs a new activity for the authenticated user. Returns 201 with the created resource. */
   @Operation(summary = "Log a new activity")
   @PostMapping
   public ResponseEntity<ActivityResponse> create(
@@ -39,6 +40,7 @@ public class ActivityController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  /** Returns a paginated list of activities for the authenticated user with optional filters. */
   @Operation(summary = "List activities with optional filters and pagination")
   @GetMapping
   public ResponseEntity<Page<ActivityResponse>> list(
@@ -54,6 +56,9 @@ public class ActivityController {
     return ResponseEntity.ok(page);
   }
 
+  /**
+   * Returns a single activity by ID, scoped to the authenticated user. Returns 404 if not found.
+   */
   @Operation(summary = "Get a single activity by ID")
   @GetMapping("/{id}")
   public ResponseEntity<ActivityResponse> get(Authentication auth, @PathVariable UUID id) {
@@ -61,6 +66,7 @@ public class ActivityController {
     return ResponseEntity.ok(activityService.getActivity(userId, id));
   }
 
+  /** Replaces all fields of an existing activity. Returns 404 if not found. */
   @Operation(summary = "Update an existing activity")
   @PutMapping("/{id}")
   public ResponseEntity<ActivityResponse> update(
@@ -69,6 +75,7 @@ public class ActivityController {
     return ResponseEntity.ok(activityService.updateActivity(userId, id, request));
   }
 
+  /** Permanently deletes an activity. Returns 204 on success, 404 if not found. */
   @Operation(summary = "Delete an activity")
   @DeleteMapping("/{id}")
   public ResponseEntity<Void> delete(Authentication auth, @PathVariable UUID id) {

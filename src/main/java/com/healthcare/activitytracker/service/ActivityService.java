@@ -10,12 +10,9 @@ import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
-import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +20,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +45,16 @@ public class ActivityService {
     this.activityEventPublisher = activityEventPublisher;
   }
 
+  /**
+   * Creates a new activity record for the given user and publishes an {@code ACTIVITY_CREATED}
+   * event to Kafka.
+   *
+   * @param userId the authenticated user's ID
+   * @param request the activity details to persist
+   * @return the persisted activity as a response DTO
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
+   *     exist
+   */
   @Transactional
   public ActivityResponse createActivity(UUID userId, ActivityRequest request) {
     User user =
@@ -100,6 +106,18 @@ public class ActivityService {
         .build();
   }
 
+  /**
+   * Returns a paginated list of activities for the given user, with optional filters. Page size is
+   * capped at {@code spring.data.web.pageable.max-page-size} regardless of the requested value.
+   *
+   * @param userId the authenticated user's ID
+   * @param type optional filter by activity type
+   * @param source optional filter by activity source
+   * @param from optional inclusive start date (activities on or after this date)
+   * @param to optional inclusive end date (activities on or before this date)
+   * @param pageable pagination and sort parameters
+   * @return a page of matching activities ordered by {@code startedAt} descending
+   */
   @Transactional(readOnly = true)
   public Page<ActivityResponse> getActivities(
       UUID userId,
@@ -122,10 +140,19 @@ public class ActivityService {
     LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
     LocalDateTime toDt = to != null ? to.atTime(LocalTime.MAX) : null;
     return activityRepository
-        .findAll(activitySpec(userId, fromDt, toDt, type, source), pageable)
+        .findByFilters(userId, fromDt, toDt, type, source, pageable)
         .map(this::toResponse);
   }
 
+  /**
+   * Retrieves a single activity by ID, scoped to the requesting user.
+   *
+   * @param userId the authenticated user's ID
+   * @param activityId the activity to fetch
+   * @return the activity as a response DTO
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the activity does
+   *     not exist or belongs to a different user
+   */
   @Transactional(readOnly = true)
   public ActivityResponse getActivity(UUID userId, UUID activityId) {
     log.debug("Fetching activity {} for user {}", activityId, userId);
@@ -136,6 +163,16 @@ public class ActivityService {
     return toResponse(activity);
   }
 
+  /**
+   * Replaces all mutable fields of an existing activity with values from the request.
+   *
+   * @param userId the authenticated user's ID
+   * @param activityId the activity to update
+   * @param request the new activity details
+   * @return the updated activity as a response DTO
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the activity does
+   *     not exist or belongs to a different user
+   */
   @Transactional
   public ActivityResponse updateActivity(UUID userId, UUID activityId, ActivityRequest request) {
     Activity activity =
@@ -161,6 +198,14 @@ public class ActivityService {
     return toResponse(activity);
   }
 
+  /**
+   * Permanently deletes an activity record, scoped to the requesting user.
+   *
+   * @param userId the authenticated user's ID
+   * @param activityId the activity to delete
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the activity does
+   *     not exist or belongs to a different user
+   */
   @Transactional
   public void deleteActivity(UUID userId, UUID activityId) {
     Activity activity =
@@ -170,27 +215,6 @@ public class ActivityService {
 
     activityRepository.delete(activity);
     log.info("Activity deleted: {}", activityId);
-  }
-
-  private Specification<Activity> activitySpec(
-      UUID userId,
-      LocalDateTime from,
-      LocalDateTime to,
-      ActivityType type,
-      ActivitySource source) {
-    return (root, query, cb) -> {
-      List<Predicate> predicates = new ArrayList<>();
-      predicates.add(cb.equal(root.get("user").get("id"), userId));
-      if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("startedAt"), from));
-      if (to != null) predicates.add(cb.lessThanOrEqualTo(root.get("startedAt"), to));
-      if (type != null) predicates.add(cb.equal(root.get("activityType"), type));
-      if (source != null) predicates.add(cb.equal(root.get("source"), source));
-      // Skip ORDER BY on count queries (result type is Long)
-      if (!Long.class.equals(query.getResultType())) {
-        query.orderBy(cb.desc(root.get("startedAt")));
-      }
-      return cb.and(predicates.toArray(new Predicate[0]));
-    };
   }
 
   private ActivityResponse toResponse(Activity activity) {
