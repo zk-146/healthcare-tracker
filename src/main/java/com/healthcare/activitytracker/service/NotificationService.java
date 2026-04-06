@@ -2,6 +2,7 @@ package com.healthcare.activitytracker.service;
 
 import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.NotificationResponse;
+import com.healthcare.activitytracker.model.entity.Goal;
 import com.healthcare.activitytracker.model.entity.Notification;
 import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.model.enums.NotificationType;
@@ -67,6 +68,38 @@ public class NotificationService {
   }
 
   /**
+   * Creates and persists a goal-achieved notification for the given user.
+   *
+   * @param user the recipient
+   * @param goal the goal that was achieved today
+   */
+  @Transactional
+  public void notifyGoalAchieved(User user, Goal goal) {
+    String title = "Daily Goal Achieved!";
+    String body = goalBody(goal);
+
+    Notification notification =
+        Notification.builder()
+            .user(user)
+            .type(NotificationType.GOAL_ACHIEVED)
+            .title(title)
+            .body(body)
+            .build();
+
+    notificationRepository.save(notification);
+
+    log.info(
+        "Goal-achieved notification saved userId={} metric={} target={}",
+        user.getId(),
+        goal.getMetric(),
+        goal.getTargetValue());
+
+    log.debug(
+        "[EMAIL-PLACEHOLDER] To: {} | Subject: {} | Body: {}", user.getEmail(), title, body);
+    log.debug("[PUSH-PLACEHOLDER] userId={} title={}", user.getId(), title);
+  }
+
+  /**
    * Returns a paginated list of notifications for the given user, newest first.
    *
    * @param userId the authenticated user's ID
@@ -128,6 +161,18 @@ public class NotificationService {
         .read(n.isRead())
         .createdAt(n.getCreatedAt())
         .build();
+  }
+
+  private String goalBody(Goal goal) {
+    String metricLabel =
+        switch (goal.getMetric()) {
+          case CALORIES_BURNED -> (int) goal.getTargetValue() + " kcal burned";
+          case DURATION_MINUTES -> (int) goal.getTargetValue() + " minutes of activity";
+          case ACTIVITY_COUNT -> (int) goal.getTargetValue() + " activities logged";
+          case DISTANCE_KM -> goal.getTargetValue() + " km covered";
+          case STEPS -> (long) goal.getTargetValue() + " steps taken";
+        };
+    return "You hit your daily goal of " + metricLabel + ". Excellent work!";
   }
 
   private String milestoneTitle(int days) {

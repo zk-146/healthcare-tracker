@@ -11,6 +11,7 @@ import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
+import java.time.ZoneId;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -33,6 +34,8 @@ class ActivityEventConsumerTest {
 
   @Mock private NotificationService notificationService;
 
+  @Mock private GoalService goalService;
+
   private ActivityEventConsumer consumer;
 
   private final UUID userId = UUID.randomUUID();
@@ -45,7 +48,7 @@ class ActivityEventConsumerTest {
   void setUp() {
     consumer =
         new ActivityEventConsumer(
-            summaryService, milestoneRepository, userRepository, notificationService);
+            summaryService, milestoneRepository, userRepository, notificationService, goalService);
 
     event =
         ActivityCreatedEvent.builder()
@@ -84,6 +87,7 @@ class ActivityEventConsumerTest {
     assertThat(saved.getMilestoneDays()).isEqualTo(3);
     assertThat(saved.getTriggeringActivityId()).isEqualTo(activityId);
     assertThat(saved.getUser()).isEqualTo(user);
+    verify(goalService).evaluateGoals(userId, ZoneOffset.UTC);
   }
 
   @Test
@@ -95,6 +99,7 @@ class ActivityEventConsumerTest {
     consumer.onActivityCreated(event, 0, 0L);
 
     verify(notificationService).notifyMilestone(user, 7);
+    verify(goalService).evaluateGoals(userId, ZoneOffset.UTC);
   }
 
   @Test
@@ -107,6 +112,7 @@ class ActivityEventConsumerTest {
     verify(milestoneRepository, never()).save(any());
     verify(userRepository, never()).findById(any());
     verify(notificationService, never()).notifyMilestone(any(), anyInt());
+    verify(goalService).evaluateGoals(userId, ZoneOffset.UTC);
   }
 
   @Test
@@ -118,12 +124,13 @@ class ActivityEventConsumerTest {
     verify(milestoneRepository, never()).existsByUserIdAndMilestoneDays(any(), any());
     verify(milestoneRepository, never()).save(any());
     verify(notificationService, never()).notifyMilestone(any(), anyInt());
+    verify(goalService).evaluateGoals(userId, ZoneOffset.UTC);
   }
 
   @Test
   void savesCorrectMilestone_forEachThreshold() {
     for (int threshold : new int[] {7, 14, 30, 60, 100, 365}) {
-      reset(summaryService, milestoneRepository, userRepository, notificationService);
+      reset(summaryService, milestoneRepository, userRepository, notificationService, goalService);
 
       when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(threshold);
       when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, threshold)).thenReturn(false);

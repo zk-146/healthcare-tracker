@@ -34,16 +34,19 @@ public class ActivityEventConsumer {
   private final StreakMilestoneRepository milestoneRepository;
   private final UserRepository userRepository;
   private final NotificationService notificationService;
+  private final GoalService goalService;
 
   public ActivityEventConsumer(
       SummaryService summaryService,
       StreakMilestoneRepository milestoneRepository,
       UserRepository userRepository,
-      NotificationService notificationService) {
+      NotificationService notificationService,
+      GoalService goalService) {
     this.summaryService = summaryService;
     this.milestoneRepository = milestoneRepository;
     this.userRepository = userRepository;
     this.notificationService = notificationService;
+    this.goalService = goalService;
   }
 
   @KafkaListener(
@@ -64,6 +67,9 @@ public class ActivityEventConsumer {
         event.getActivityType(),
         partition,
         offset);
+
+    // Always evaluate daily goals for every new activity
+    goalService.evaluateGoals(event.getUserId(), ZoneOffset.UTC);
 
     int streak = summaryService.getCurrentStreak(event.getUserId(), ZoneOffset.UTC);
 
