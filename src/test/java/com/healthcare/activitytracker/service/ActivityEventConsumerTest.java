@@ -31,6 +31,8 @@ class ActivityEventConsumerTest {
 
   @Mock private UserRepository userRepository;
 
+  @Mock private NotificationService notificationService;
+
   private ActivityEventConsumer consumer;
 
   private final UUID userId = UUID.randomUUID();
@@ -41,7 +43,9 @@ class ActivityEventConsumerTest {
 
   @BeforeEach
   void setUp() {
-    consumer = new ActivityEventConsumer(summaryService, milestoneRepository, userRepository);
+    consumer =
+        new ActivityEventConsumer(
+            summaryService, milestoneRepository, userRepository, notificationService);
 
     event =
         ActivityCreatedEvent.builder()
@@ -83,6 +87,17 @@ class ActivityEventConsumerTest {
   }
 
   @Test
+  void dispatchesNotification_whenMilestoneReached() {
+    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(7);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 7)).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    consumer.onActivityCreated(event, 0, 0L);
+
+    verify(notificationService).notifyMilestone(user, 7);
+  }
+
+  @Test
   void doesNotSave_whenMilestoneAlreadyExists() {
     when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(3);
     when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 3)).thenReturn(true);
@@ -91,6 +106,7 @@ class ActivityEventConsumerTest {
 
     verify(milestoneRepository, never()).save(any());
     verify(userRepository, never()).findById(any());
+    verify(notificationService, never()).notifyMilestone(any(), anyInt());
   }
 
   @Test
@@ -101,12 +117,13 @@ class ActivityEventConsumerTest {
 
     verify(milestoneRepository, never()).existsByUserIdAndMilestoneDays(any(), any());
     verify(milestoneRepository, never()).save(any());
+    verify(notificationService, never()).notifyMilestone(any(), anyInt());
   }
 
   @Test
   void savesCorrectMilestone_forEachThreshold() {
     for (int threshold : new int[] {7, 14, 30, 60, 100, 365}) {
-      reset(summaryService, milestoneRepository, userRepository);
+      reset(summaryService, milestoneRepository, userRepository, notificationService);
 
       when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(threshold);
       when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, threshold)).thenReturn(false);
@@ -117,6 +134,7 @@ class ActivityEventConsumerTest {
       ArgumentCaptor<StreakMilestone> captor = ArgumentCaptor.forClass(StreakMilestone.class);
       verify(milestoneRepository).save(captor.capture());
       assertThat(captor.getValue().getMilestoneDays()).isEqualTo(threshold);
+      verify(notificationService).notifyMilestone(user, threshold);
     }
   }
 }
