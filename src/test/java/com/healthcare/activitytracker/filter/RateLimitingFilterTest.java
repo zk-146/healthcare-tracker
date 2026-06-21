@@ -17,7 +17,7 @@ class RateLimitingFilterTest {
 
   @BeforeEach
   void setUp() {
-    filter = new RateLimitingFilter();
+    filter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(filter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(filter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(filter, "trustedProxiesConfig", "");
@@ -50,7 +50,7 @@ class RateLimitingFilterTest {
   @Test
   void apiRequest_exceedingLimit_returns429() throws Exception {
     // Set a very tight limit of 1 request per minute
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -77,7 +77,7 @@ class RateLimitingFilterTest {
 
   @Test
   void authEndpoint_exceedingAuthLimit_returns429() throws Exception {
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -100,11 +100,38 @@ class RateLimitingFilterTest {
   }
 
   @Test
+  void authEndpoint_doesNotConsumeGeneralApiBudget() throws Exception {
+    // api budget of exactly 1; an auth request must NOT draw from it.
+    RateLimitingFilter f = new RateLimitingFilter(null);
+    ReflectionTestUtils.setField(f, "authRequestsPerMinute", 10);
+    ReflectionTestUtils.setField(f, "apiRequestsPerMinute", 1);
+    ReflectionTestUtils.setField(f, "trustedProxiesConfig", "");
+    f.init();
+
+    String ip = "10.0.0.9";
+    FilterChain chain = mock(FilterChain.class);
+
+    // An auth call should consume only the auth bucket.
+    MockHttpServletRequest authReq = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+    authReq.setRemoteAddr(ip);
+    MockHttpServletResponse authRes = new MockHttpServletResponse();
+    f.doFilterInternal(authReq, authRes, chain);
+    assertThat(authRes.getStatus()).isEqualTo(200);
+
+    // The single API token is still available afterwards.
+    MockHttpServletRequest apiReq = new MockHttpServletRequest("GET", "/api/v1/activities");
+    apiReq.setRemoteAddr(ip);
+    MockHttpServletResponse apiRes = new MockHttpServletResponse();
+    f.doFilterInternal(apiReq, apiRes, chain);
+    assertThat(apiRes.getStatus()).isEqualTo(200);
+  }
+
+  @Test
   void xForwardedFor_notTrusted_whenNoProxyConfigured() throws Exception {
     // With no trusted proxies, X-Forwarded-For must be ignored.
     // Two requests from the same "real" IP (even with different X-Forwarded-For headers)
     // should share the same bucket.
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -131,7 +158,7 @@ class RateLimitingFilterTest {
 
   @Test
   void xForwardedFor_trusted_whenProxyConfigured() throws Exception {
-    RateLimitingFilter proxyFilter = new RateLimitingFilter();
+    RateLimitingFilter proxyFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(proxyFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(proxyFilter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(proxyFilter, "trustedProxiesConfig", "10.0.0.1");

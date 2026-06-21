@@ -20,6 +20,7 @@ public class ProfileResponse {
   private String gender;
   private Double heightCm;
   private Double weightKg;
+  private String timezone;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

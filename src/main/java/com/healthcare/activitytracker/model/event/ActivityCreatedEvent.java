@@ -37,4 +37,10 @@ public class ActivityCreatedEvent {
   private Double caloriesBurned;
   private Double distanceKm;
   private LocalDateTime startedAt;
+
+  /**
+   * The user's preferred IANA timezone at publish time, used by the consumer for streak-boundary
+   * calculations. {@code null} is treated as UTC.
+   */
+  private String userTimezone;
 }

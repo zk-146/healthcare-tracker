@@ -18,7 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -63,6 +65,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   private final ConcurrentHashMap<String, BucketEntry> apiBuckets = new ConcurrentHashMap<>();
 
+  /**
+   * When Redis is available, rate limiting is enforced with a shared fixed-window counter so the
+   * configured limit is global across all application instances. When Redis is absent (or
+   * unreachable at request time) the filter falls back to the per-instance in-memory buckets above.
+   */
+  @Nullable private final StringRedisTemplate redisTemplate;
+
+  public RateLimitingFilter(@Nullable StringRedisTemplate redisTemplate) {
+    this.redisTemplate = redisTemplate;
+  }
+
   @PostConstruct
   public void init() {
     trustedProxies =
@@ -83,17 +96,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String clientIp = getClientIp(request);
 
-    // Stricter limit for auth endpoints (brute force protection)
+    // Auth endpoints get their own stricter limit. They are NOT also charged against the general
+    // API budget, so a burst of logins can't exhaust a user's normal API allowance.
     if (AUTH_RATE_LIMITED_URIS.contains(uri)) {
-      if (!tryConsume(authBuckets, clientIp, authRequestsPerMinute)) {
+      if (!tryConsume("auth", authBuckets, clientIp, authRequestsPerMinute)) {
         sendRateLimitResponse(response, clientIp, uri);
         return;
       }
-    }
-
-    // General API rate limit for all /api/ endpoints
-    if (uri.startsWith("/api/")) {
-      if (!tryConsume(apiBuckets, clientIp, apiRequestsPerMinute)) {
+    } else if (uri.startsWith("/api/")) {
+      // General API rate limit for all other /api/ endpoints
+      if (!tryConsume("api", apiBuckets, clientIp, apiRequestsPerMinute)) {
         sendRateLimitResponse(response, clientIp, uri);
         return;
       }
@@ -103,9 +115,42 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   private boolean tryConsume(
-      ConcurrentHashMap<String, BucketEntry> bucketMap, String clientIp, int limitPerMinute) {
+      String scope,
+      ConcurrentHashMap<String, BucketEntry> bucketMap,
+      String clientIp,
+      int limitPerMinute) {
+    // Prefer the distributed counter; fall back to the in-memory bucket if Redis is unavailable.
+    if (redisTemplate != null) {
+      Boolean allowed = tryConsumeDistributed(scope, clientIp, limitPerMinute);
+      if (allowed != null) {
+        return allowed;
+      }
+    }
     Bucket bucket = getOrCreateBucket(bucketMap, clientIp, limitPerMinute);
     return bucket.tryConsume(1);
+  }
+
+  /**
+   * Distributed fixed-window rate limit backed by Redis. Increments a per-IP, per-minute counter
+   * and allows the request when the counter is within the limit. Returns {@code null} (rather than
+   * throwing) when Redis is unreachable so the caller can fall back to the in-memory limiter.
+   */
+  @Nullable
+  private Boolean tryConsumeDistributed(String scope, String clientIp, int limitPerMinute) {
+    long windowMinute = System.currentTimeMillis() / 60_000L;
+    String key = "ratelimit:" + scope + ":" + clientIp + ":" + windowMinute;
+    try {
+      Long count = redisTemplate.opsForValue().increment(key);
+      if (count != null && count == 1L) {
+        // First hit in this window — expire slightly after the window closes.
+        redisTemplate.expire(key, Duration.ofSeconds(70));
+      }
+      return count == null || count <= limitPerMinute;
+    } catch (Exception e) {
+      log.warn(
+          "Redis unavailable for rate limiting, falling back to in-memory: {}", e.getMessage());
+      return null;
+    }
   }
 
   private void sendRateLimitResponse(HttpServletResponse response, String clientIp, String uri)

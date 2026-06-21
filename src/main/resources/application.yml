@@ -103,6 +103,10 @@ app:
     # Comma-separated list of trusted reverse-proxy IPs.
     # Only these IPs may set X-Forwarded-For. Leave empty to disable header trust.
     trusted-proxies: ${TRUSTED_PROXIES:}
+    login:
+      # Lock an account after this many consecutive failed logins, for the duration below.
+      max-failed-attempts: 5
+      lock-duration-minutes: 15
   summary:
     max-range-days: 365
   kafka:

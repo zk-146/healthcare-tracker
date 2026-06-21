@@ -36,11 +36,11 @@ public class ActivityRequest {
   @Max(value = 1440, message = "Duration cannot exceed 1440 minutes (24 hours)")
   private Integer durationMinutes;
 
-  @DecimalMin(value = "0.0", inclusive = false, message = "Distance must be greater than 0")
+  @DecimalMin(value = "0.0", message = "Distance cannot be negative")
   @DecimalMax(value = "1000.0", message = "Distance cannot exceed 1000 km")
   private Double distanceKm;
 
-  @DecimalMin(value = "0.0", inclusive = false, message = "Calories must be greater than 0")
+  @DecimalMin(value = "0.0", message = "Calories cannot be negative")
   @DecimalMax(value = "10000.0", message = "Calories cannot exceed 10000")
   private Double caloriesBurned;
 
@@ -49,7 +49,9 @@ public class ActivityRequest {
   @Max(value = 300, message = "Heart rate cannot exceed 300 bpm")
   private Integer heartRateAvg;
 
-  @Min(value = 1, message = "Steps must be at least 1")
+  // Zero is valid for non-step activities (e.g. weightlifting, yoga); only null means "not
+  // measured".
+  @Min(value = 0, message = "Steps cannot be negative")
   @Max(value = 100_000, message = "Steps cannot exceed 100,000")
   private Integer steps;
 

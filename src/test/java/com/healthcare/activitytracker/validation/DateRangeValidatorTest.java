@@ -53,4 +53,31 @@ class DateRangeValidatorTest {
     ActivityRequest req = buildRequest(null, LocalDateTime.now());
     assertThat(validator.isValid(req, null)).isTrue();
   }
+
+  @Test
+  void isValid_returnsFalseWhenDurationFarExceedsElapsed() {
+    // 60 min elapsed, but 240 min declared — over-reporting beyond the 60-min tolerance.
+    LocalDateTime start = LocalDateTime.now().minusHours(2);
+    ActivityRequest req = buildRequest(start, start.plusMinutes(60));
+    req.setDurationMinutes(240);
+    assertThat(validator.isValid(req, null)).isFalse();
+  }
+
+  @Test
+  void isValid_returnsFalseWhenDurationFarBelowElapsed() {
+    // 120 min elapsed, but only 10 min declared — under-reporting beyond the 60-min tolerance.
+    LocalDateTime start = LocalDateTime.now().minusHours(3);
+    ActivityRequest req = buildRequest(start, start.plusMinutes(120));
+    req.setDurationMinutes(10);
+    assertThat(validator.isValid(req, null)).isFalse();
+  }
+
+  @Test
+  void isValid_returnsTrueWhenDurationWithinTolerance() {
+    // 60 min elapsed, 90 min declared — within the 60-min tolerance.
+    LocalDateTime start = LocalDateTime.now().minusHours(2);
+    ActivityRequest req = buildRequest(start, start.plusMinutes(60));
+    req.setDurationMinutes(90);
+    assertThat(validator.isValid(req, null)).isTrue();
+  }
 }

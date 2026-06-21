@@ -6,7 +6,6 @@ import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.repository.projection.ActivityTypeSummaryProjection;
 import com.healthcare.activitytracker.repository.projection.DistanceStepsProjection;
 import com.healthcare.activitytracker.repository.projection.SourceCountProjection;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -87,9 +86,14 @@ public interface ActivityRepository
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
 
+  /**
+   * Returns the raw {@code startedAt} timestamps (interpreted as UTC) for a user since a cutoff.
+   * The caller buckets these into calendar dates in the user's timezone — date truncation is
+   * deliberately NOT done in the database, because the stored {@code timestamp} column is zoneless
+   * and a DB-side cast would bucket by server time rather than the user's local day.
+   */
   @Query(
-      "SELECT DISTINCT CAST(a.startedAt AS java.time.LocalDate) FROM Activity a "
-          + "WHERE a.user.id = :userId AND a.startedAt >= :since ORDER BY 1 DESC")
-  List<LocalDate> findDistinctActiveDatesByUserId(
+      "SELECT a.startedAt FROM Activity a " + "WHERE a.user.id = :userId AND a.startedAt >= :since")
+  List<LocalDateTime> findActiveStartTimesSince(
       @Param("userId") UUID userId, @Param("since") LocalDateTime since);
 }

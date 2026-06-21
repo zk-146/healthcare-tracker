@@ -34,6 +34,7 @@ class AuthServiceTest {
 
   private PasswordEncoder passwordEncoder;
   private JwtUtil jwtUtil;
+  private LoginAttemptService loginAttemptService;
   private AuthService authService;
 
   @BeforeEach
@@ -47,13 +48,20 @@ class AuthServiceTest {
             604_800_000L,
             "activity-tracker",
             "activity-tracker-users");
+    // Real in-memory instance (no Redis); configure thresholds via reflection.
+    loginAttemptService = new LoginAttemptService(null);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        loginAttemptService, "maxFailedAttempts", 5);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        loginAttemptService, "lockDurationMinutes", 15L);
     authService =
         new AuthService(
             userRepository,
             refreshTokenRepository,
             passwordEncoder,
             jwtUtil,
-            tokenBlacklistService);
+            tokenBlacklistService,
+            loginAttemptService);
   }
 
   @Test
@@ -214,5 +222,78 @@ class AuthServiceTest {
     assertThatThrownBy(() -> authService.refresh(refreshToken))
         .isInstanceOf(UnauthorizedException.class)
         .hasMessageContaining("revoked");
+  }
+
+  @Test
+  void refresh_reuseOfRevokedToken_revokesEntireTokenFamily() {
+    UUID userId = UUID.randomUUID();
+    String refreshToken = jwtUtil.generateRefreshToken(userId, "user@example.com");
+    String tokenHash = AuthService.sha256(refreshToken);
+
+    User user =
+        User.builder()
+            .id(userId)
+            .email("user@example.com")
+            .passwordHash("hash")
+            .fullName("Test User")
+            .build();
+
+    RefreshToken storedToken =
+        RefreshToken.builder().tokenHash(tokenHash).user(user).revoked(true).build();
+
+    when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(storedToken));
+
+    assertThatThrownBy(() -> authService.refresh(refreshToken))
+        .isInstanceOf(UnauthorizedException.class);
+
+    // Reuse of a rotated/revoked token must invalidate the whole family + active access tokens.
+    org.mockito.Mockito.verify(refreshTokenRepository).revokeAllByUserId(userId);
+    org.mockito.Mockito.verify(tokenBlacklistService)
+        .revokeAllForUser(
+            org.mockito.ArgumentMatchers.eq(userId.toString()),
+            org.mockito.ArgumentMatchers.anyLong());
+  }
+
+  @Test
+  void login_locksAccount_afterTooManyFailedAttempts() {
+    LoginRequest request = new LoginRequest();
+    request.setEmail("victim@example.com");
+    request.setPassword("wrongpassword!");
+
+    User user =
+        User.builder()
+            .id(UUID.randomUUID())
+            .email("victim@example.com")
+            .passwordHash(passwordEncoder.encode("correctpassword!"))
+            .fullName("Test User")
+            .build();
+
+    when(userRepository.findByEmail("victim@example.com")).thenReturn(Optional.of(user));
+
+    // Exhaust the 5-attempt budget with wrong passwords.
+    for (int i = 0; i < 5; i++) {
+      assertThatThrownBy(() -> authService.login(request))
+          .isInstanceOf(UnauthorizedException.class)
+          .hasMessageContaining("Invalid email or password");
+    }
+
+    // The next attempt is rejected by lockout before credentials are even checked.
+    assertThatThrownBy(() -> authService.login(request))
+        .isInstanceOf(UnauthorizedException.class)
+        .hasMessageContaining("locked");
+  }
+
+  @Test
+  void logout_invalidatesAllUserAccessTokens() {
+    UUID userId = UUID.randomUUID();
+    String accessToken = jwtUtil.generateAccessToken(userId, "user@example.com");
+
+    authService.logout(accessToken);
+
+    org.mockito.Mockito.verify(tokenBlacklistService)
+        .revokeAllForUser(
+            org.mockito.ArgumentMatchers.eq(userId.toString()),
+            org.mockito.ArgumentMatchers.anyLong());
+    org.mockito.Mockito.verify(refreshTokenRepository).revokeAllByUserId(userId);
   }
 }

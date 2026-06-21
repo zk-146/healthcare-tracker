@@ -6,7 +6,6 @@ import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +60,11 @@ public class ActivityEventConsumer {
         partition,
         offset);
 
-    int streak = summaryService.getCurrentStreak(event.getUserId(), ZoneOffset.UTC);
+    // Use the user's preferred timezone (carried on the event) so milestone streaks are computed
+    // on the same calendar-day boundaries the user sees in their summaries. Falls back to UTC.
+    int streak =
+        summaryService.getCurrentStreak(
+            event.getUserId(), SummaryService.resolveZone(event.getUserTimezone()));
 
     if (!MILESTONE_THRESHOLDS.contains(streak)) {
       return;

@@ -25,11 +25,15 @@ public class TokenBlacklistService {
 
   private static final Logger log = LoggerFactory.getLogger(TokenBlacklistService.class);
   private static final String REDIS_KEY_PREFIX = "token:blacklist:";
+  private static final String USER_INVALIDATION_PREFIX = "user:invalidate:";
 
   @Nullable private final StringRedisTemplate redisTemplate;
 
   // Fallback in-memory store: token -> absolute expiry time in epoch ms
   private final ConcurrentHashMap<String, Long> localBlacklist = new ConcurrentHashMap<>();
+
+  // Fallback in-memory store for per-user invalidation cutoffs: userId -> {cutoffMs, expiresAtMs}
+  private final ConcurrentHashMap<String, long[]> localUserInvalidation = new ConcurrentHashMap<>();
 
   public TokenBlacklistService(@Nullable StringRedisTemplate redisTemplate) {
     this.redisTemplate = redisTemplate;
@@ -92,6 +96,62 @@ public class TokenBlacklistService {
   }
 
   /**
+   * Invalidates every access token issued for the given user up to the current instant. Used on
+   * logout to enforce a "log out everywhere" semantic without enumerating individual tokens — any
+   * access token whose {@code iat} predates this call is rejected by {@link
+   * #isUserInvalidatedSince(String, long)}.
+   *
+   * @param userId the user whose existing access tokens should be invalidated
+   * @param ttlMs how long the cutoff must be retained — set to the maximum access-token lifetime,
+   *     so that once all pre-cutoff tokens have expired the marker can be discarded
+   */
+  public void revokeAllForUser(String userId, long ttlMs) {
+    long now = System.currentTimeMillis();
+    if (redisTemplate != null) {
+      try {
+        redisTemplate
+            .opsForValue()
+            .set(USER_INVALIDATION_PREFIX + userId, Long.toString(now), Duration.ofMillis(ttlMs));
+        return;
+      } catch (Exception e) {
+        log.warn(
+            "Redis unavailable for user invalidation, falling back to in-memory: {}",
+            e.getMessage());
+      }
+    }
+    localUserInvalidation.put(userId, new long[] {now, now + ttlMs});
+  }
+
+  /**
+   * Returns true if the user has a logout/invalidation cutoff that is more recent than the supplied
+   * token issue time, meaning the token was issued before the user logged out everywhere.
+   *
+   * @param userId the token subject
+   * @param issuedAtMs the token's {@code iat} claim in epoch milliseconds
+   */
+  public boolean isUserInvalidatedSince(String userId, long issuedAtMs) {
+    if (redisTemplate != null) {
+      try {
+        String cutoff = redisTemplate.opsForValue().get(USER_INVALIDATION_PREFIX + userId);
+        return cutoff != null && issuedAtMs < Long.parseLong(cutoff);
+      } catch (Exception e) {
+        log.warn(
+            "Redis unavailable for user invalidation check, falling back to in-memory: {}",
+            e.getMessage());
+      }
+    }
+    long[] entry = localUserInvalidation.get(userId);
+    if (entry == null) {
+      return false;
+    }
+    if (System.currentTimeMillis() > entry[1]) {
+      localUserInvalidation.remove(userId);
+      return false;
+    }
+    return issuedAtMs < entry[0];
+  }
+
+  /**
    * Returns the SHA-256 hex digest of the given token. Raw JWTs can be 500+ bytes; using a 64-char
    * hash keeps Redis keys small and avoids storing any recoverable token data in the blacklist
    * store.
@@ -115,6 +175,7 @@ public class TokenBlacklistService {
     long now = System.currentTimeMillis();
     int before = localBlacklist.size();
     localBlacklist.entrySet().removeIf(entry -> now > entry.getValue());
+    localUserInvalidation.entrySet().removeIf(entry -> now > entry.getValue()[1]);
     int removed = before - localBlacklist.size();
     if (removed > 0) {
       log.debug(

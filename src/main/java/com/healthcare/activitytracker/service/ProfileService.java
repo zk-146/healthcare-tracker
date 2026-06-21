@@ -57,9 +57,23 @@ public class ProfileService {
     if (request.getGender() != null) user.setGender(request.getGender());
     if (request.getHeightCm() != null) user.setHeightCm(request.getHeightCm());
     if (request.getWeightKg() != null) user.setWeightKg(request.getWeightKg());
+    if (request.getTimezone() != null) user.setTimezone(validateTimezone(request.getTimezone()));
 
     user = userRepository.save(user);
     return toResponse(user);
+  }
+
+  /**
+   * Validates that the supplied string is a recognized IANA timezone.
+   *
+   * @throws IllegalArgumentException if the value is not a valid {@link java.time.ZoneId}
+   */
+  private String validateTimezone(String timezone) {
+    try {
+      return java.time.ZoneId.of(timezone).getId();
+    } catch (java.time.DateTimeException e) {
+      throw new IllegalArgumentException("Invalid timezone: '" + timezone + "'");
+    }
   }
 
   private ProfileResponse toResponse(User user) {
@@ -71,6 +85,7 @@ public class ProfileService {
         .gender(user.getGender())
         .heightCm(user.getHeightCm())
         .weightKg(user.getWeightKg())
+        .timezone(user.getTimezone())
         .createdAt(user.getCreatedAt())
         .updatedAt(user.getUpdatedAt())
         .build();

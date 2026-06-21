@@ -103,6 +103,7 @@ public class ActivityService {
         .caloriesBurned(activity.getCaloriesBurned())
         .distanceKm(activity.getDistanceKm())
         .startedAt(activity.getStartedAt())
+        .userTimezone(activity.getUser().getTimezone())
         .build();
   }
 

@@ -50,6 +50,13 @@ public class User {
   @Column(name = "weight_kg")
   private Double weightKg;
 
+  /**
+   * Optional IANA timezone (e.g. {@code America/New_York}) used for streak-boundary calculations in
+   * asynchronous milestone detection. {@code null} is treated as UTC.
+   */
+  @Column(length = 64)
+  private String timezone;
+
   @CreationTimestamp
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;

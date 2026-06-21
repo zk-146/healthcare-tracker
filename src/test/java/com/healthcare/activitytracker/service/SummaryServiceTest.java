@@ -63,11 +63,11 @@ class SummaryServiceTest {
         .thenReturn(List.of(typeRow));
     when(activityRepository.sumDistanceAndSteps(eq(userId), any(), any()))
         .thenReturn(List.of(distSteps));
-    when(activityRepository.findDistinctActiveDatesByUserId(eq(userId), any()))
+    when(activityRepository.findActiveStartTimesSince(eq(userId), any()))
         .thenReturn(
             List.of(
-                LocalDate.now(java.time.ZoneId.of("UTC")),
-                LocalDate.now(java.time.ZoneId.of("UTC")).minusDays(1)));
+                LocalDate.now(ZoneId.of("UTC")).atStartOfDay().plusHours(12),
+                LocalDate.now(ZoneId.of("UTC")).minusDays(1).atStartOfDay().plusHours(12)));
 
     SummaryResponse summary =
         summaryService.getSummary(
@@ -97,8 +97,7 @@ class SummaryServiceTest {
         .thenReturn(List.of());
     when(activityRepository.sumDistanceAndSteps(any(), any(), any()))
         .thenReturn(List.of(distSteps));
-    when(activityRepository.findDistinctActiveDatesByUserId(eq(userId), any()))
-        .thenReturn(List.of());
+    when(activityRepository.findActiveStartTimesSince(eq(userId), any())).thenReturn(List.of());
 
     SummaryResponse summary =
         summaryService.getSummary(userId, LocalDate.now(), LocalDate.now(), ZoneId.of("UTC"));
@@ -123,8 +122,7 @@ class SummaryServiceTest {
         .thenReturn(List.of(typeRow));
     when(activityRepository.sumDistanceAndSteps(any(), any(), any()))
         .thenReturn(List.of(distSteps));
-    when(activityRepository.findDistinctActiveDatesByUserId(eq(userId), any()))
-        .thenReturn(List.of());
+    when(activityRepository.findActiveStartTimesSince(eq(userId), any())).thenReturn(List.of());
 
     LocalDate from = LocalDate.now().minusDays(6);
     LocalDate to = LocalDate.now();

@@ -28,3 +28,7 @@ app:
   rate-limit:
     auth-requests-per-minute: 10
     api-requests-per-minute: 60
+  security:
+    login:
+      max-failed-attempts: 5
+      lock-duration-minutes: 15

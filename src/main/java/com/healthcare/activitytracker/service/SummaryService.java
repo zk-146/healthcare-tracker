@@ -29,6 +29,22 @@ public class SummaryService {
   }
 
   /**
+   * Resolves an IANA timezone string to a {@link ZoneId}, falling back to UTC for null, blank, or
+   * unrecognized values. Shared by the Summary API and asynchronous milestone detection so that
+   * streak boundaries are computed consistently.
+   */
+  public static ZoneId resolveZone(String timezone) {
+    if (timezone == null || timezone.isBlank()) {
+      return ZoneOffset.UTC;
+    }
+    try {
+      return ZoneId.of(timezone);
+    } catch (DateTimeException e) {
+      return ZoneOffset.UTC;
+    }
+  }
+
+  /**
    * Returns aggregated activity statistics for the given date range. Aggregations include totals by
    * source and activity type, overall distance/steps/calories, and the current streak.
    *
@@ -174,13 +190,19 @@ public class SummaryService {
    */
   @Transactional(readOnly = true)
   public int getCurrentStreak(UUID userId, ZoneId zone) {
+    // Generous lower bound so a zone shift near the boundary can't truncate the streak window.
     LocalDateTime since = LocalDate.now(zone).minusDays(400).atStartOfDay();
-    List<LocalDate> activeDates = activityRepository.findDistinctActiveDatesByUserId(userId, since);
-    if (activeDates == null || activeDates.isEmpty()) {
+    List<LocalDateTime> activeTimes = activityRepository.findActiveStartTimesSince(userId, since);
+    if (activeTimes == null || activeTimes.isEmpty()) {
       return 0;
     }
 
-    Set<LocalDate> dateSet = new HashSet<>(activeDates);
+    // Stored timestamps are zoneless (treated as UTC); bucket each into the user's local calendar
+    // day.
+    Set<LocalDate> dateSet = new HashSet<>();
+    for (LocalDateTime ts : activeTimes) {
+      dateSet.add(ts.atZone(ZoneOffset.UTC).withZoneSameInstant(zone).toLocalDate());
+    }
     LocalDate cursor = LocalDate.now(zone);
 
     // If today has no activity yet, start streak check from yesterday

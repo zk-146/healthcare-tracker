@@ -29,4 +29,11 @@ public class ProfileUpdateRequest {
   @DecimalMin(value = "0.1", message = "Weight must be at least 0.1 kg")
   @DecimalMax(value = "700.0", message = "Weight cannot exceed 700 kg")
   private Double weightKg;
+
+  /**
+   * IANA timezone identifier (e.g. {@code America/New_York}). Used for streak-boundary calculations
+   * in milestone detection. Validity is checked in the service layer.
+   */
+  @Size(max = 64, message = "Timezone must not exceed 64 characters")
+  private String timezone;
 }

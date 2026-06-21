@@ -37,18 +37,21 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
+  private final LoginAttemptService loginAttemptService;
 
   public AuthService(
       UserRepository userRepository,
       RefreshTokenRepository refreshTokenRepository,
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
-      TokenBlacklistService tokenBlacklistService) {
+      TokenBlacklistService tokenBlacklistService,
+      LoginAttemptService loginAttemptService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.tokenBlacklistService = tokenBlacklistService;
+    this.loginAttemptService = loginAttemptService;
   }
 
   /**
@@ -94,16 +97,32 @@ public class AuthService {
   public AuthResponse login(LoginRequest request) {
     String normalizedEmail = request.getEmail().strip().toLowerCase(Locale.ROOT);
 
+    // Account-level lockout protects a single account against distributed (multi-IP) brute force,
+    // which per-IP rate limiting alone cannot stop.
+    if (loginAttemptService.isLocked(normalizedEmail)) {
+      log.warn("Login blocked for locked account: {}", normalizedEmail);
+      throw new UnauthorizedException(
+          "Account temporarily locked due to too many failed login attempts. Try again later.");
+    }
+
     User user =
         userRepository
             .findByEmail(normalizedEmail)
-            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+            .orElseThrow(
+                () -> {
+                  // Count attempts even for unknown emails so the lockout response is uniform and
+                  // does not reveal whether an account exists.
+                  loginAttemptService.recordFailure(normalizedEmail);
+                  return new UnauthorizedException("Invalid email or password");
+                });
 
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+      loginAttemptService.recordFailure(normalizedEmail);
       log.warn("Failed login attempt for userId: {}", user.getId());
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    loginAttemptService.reset(normalizedEmail);
     log.info("User logged in: {}", user.getId());
     return buildAuthResponse(user);
   }
@@ -137,6 +156,16 @@ public class AuthService {
             .findByTokenHash(tokenHash)
             .orElseThrow(() -> new UnauthorizedException("Refresh token not found"));
     if (storedToken.isRevoked()) {
+      // Reuse of an already-rotated token signals theft: revoke the entire token family so the
+      // attacker and the legitimate holder are both forced to re-authenticate.
+      java.util.UUID compromisedUserId = storedToken.getUser().getId();
+      int revoked = refreshTokenRepository.revokeAllByUserId(compromisedUserId);
+      tokenBlacklistService.revokeAllForUser(
+          compromisedUserId.toString(), jwtUtil.getAccessTokenExpiryMs());
+      log.warn(
+          "Refresh token reuse detected for user {} — revoked {} token(s) and invalidated active sessions",
+          compromisedUserId,
+          revoked);
       throw new UnauthorizedException("Refresh token has been revoked");
     }
 
@@ -169,11 +198,14 @@ public class AuthService {
         long remainingMs = claims.getExpiration().getTime() - new Date().getTime();
         tokenBlacklistService.revoke(accessToken, Math.max(remainingMs, 0));
 
-        // Revoke all refresh tokens for this user
         var userId = jwtUtil.getUserIdFromToken(accessToken);
+        // Invalidate every access token issued to this user up to now, so "logout" applies across
+        // all devices/sessions rather than only the presented token.
+        tokenBlacklistService.revokeAllForUser(userId.toString(), jwtUtil.getAccessTokenExpiryMs());
+        // Revoke all refresh tokens for this user
         int revoked = refreshTokenRepository.revokeAllByUserId(userId);
         log.info(
-            "User {} logged out: access token blacklisted, {} refresh token(s) revoked",
+            "User {} logged out: access tokens invalidated, {} refresh token(s) revoked",
             userId,
             revoked);
       }

@@ -104,6 +104,33 @@ class ActivityEventConsumerTest {
   }
 
   @Test
+  void usesUserTimezoneFromEvent_forStreakCalculation() {
+    ActivityCreatedEvent tzEvent =
+        ActivityCreatedEvent.builder()
+            .eventId(UUID.randomUUID())
+            .eventType("ACTIVITY_CREATED")
+            .occurredAt(LocalDateTime.now())
+            .activityId(activityId)
+            .userId(userId)
+            .activityType(ActivityType.RUNNING)
+            .source(ActivitySource.MANUAL)
+            .startedAt(LocalDateTime.now())
+            .userTimezone("America/New_York")
+            .build();
+
+    when(summaryService.getCurrentStreak(userId, java.time.ZoneId.of("America/New_York")))
+        .thenReturn(3);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 3)).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    consumer.onActivityCreated(tzEvent, 0, 0L);
+
+    // Streak must be computed in the user's timezone, not hardcoded UTC.
+    verify(summaryService).getCurrentStreak(userId, java.time.ZoneId.of("America/New_York"));
+    verify(milestoneRepository).save(any(StreakMilestone.class));
+  }
+
+  @Test
   void savesCorrectMilestone_forEachThreshold() {
     for (int threshold : new int[] {7, 14, 30, 60, 100, 365}) {
       reset(summaryService, milestoneRepository, userRepository);

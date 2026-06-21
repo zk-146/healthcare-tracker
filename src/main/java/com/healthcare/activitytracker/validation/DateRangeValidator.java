@@ -37,7 +37,10 @@ public class DateRangeValidator implements ConstraintValidator<ValidDateRange, A
       long elapsedMinutes =
           ChronoUnit.MINUTES.between(request.getStartedAt(), request.getEndedAt());
       long declared = request.getDurationMinutes();
-      if (declared > elapsedMinutes + DURATION_TOLERANCE_MINUTES) {
+      // Reject both over-reporting (declared far exceeds elapsed) and under-reporting
+      // (declared far below elapsed); either indicates inconsistent client data.
+      if (declared > elapsedMinutes + DURATION_TOLERANCE_MINUTES
+          || declared < elapsedMinutes - DURATION_TOLERANCE_MINUTES) {
         if (context != null) {
           context.disableDefaultConstraintViolation();
           context
