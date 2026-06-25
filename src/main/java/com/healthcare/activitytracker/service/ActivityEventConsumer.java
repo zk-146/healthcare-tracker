@@ -33,14 +33,17 @@ public class ActivityEventConsumer {
   private final SummaryService summaryService;
   private final StreakMilestoneRepository milestoneRepository;
   private final UserRepository userRepository;
+  private final NotificationService notificationService;
 
   public ActivityEventConsumer(
       SummaryService summaryService,
       StreakMilestoneRepository milestoneRepository,
-      UserRepository userRepository) {
+      UserRepository userRepository,
+      NotificationService notificationService) {
     this.summaryService = summaryService;
     this.milestoneRepository = milestoneRepository;
     this.userRepository = userRepository;
+    this.notificationService = notificationService;
   }
 
   @KafkaListener(
@@ -93,7 +96,6 @@ public class ActivityEventConsumer {
         streak,
         event.getActivityId());
 
-    // TODO: dispatch notification (push/email/in-app) here.
-    //       Detection is done — a small NotificationService call is all that's needed.
+    notificationService.sendMilestoneNotification(user, streak, event.getActivityId());
   }
 }
