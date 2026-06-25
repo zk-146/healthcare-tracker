@@ -2,6 +2,7 @@ package com.healthcare.activitytracker.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import com.healthcare.activitytracker.model.entity.StreakMilestone;
@@ -31,6 +32,8 @@ class ActivityEventConsumerTest {
 
   @Mock private UserRepository userRepository;
 
+  @Mock private NotificationService notificationService;
+
   private ActivityEventConsumer consumer;
 
   private final UUID userId = UUID.randomUUID();
@@ -41,7 +44,9 @@ class ActivityEventConsumerTest {
 
   @BeforeEach
   void setUp() {
-    consumer = new ActivityEventConsumer(summaryService, milestoneRepository, userRepository);
+    consumer =
+        new ActivityEventConsumer(
+            summaryService, milestoneRepository, userRepository, notificationService);
 
     event =
         ActivityCreatedEvent.builder()
@@ -80,6 +85,8 @@ class ActivityEventConsumerTest {
     assertThat(saved.getMilestoneDays()).isEqualTo(3);
     assertThat(saved.getTriggeringActivityId()).isEqualTo(activityId);
     assertThat(saved.getUser()).isEqualTo(user);
+
+    verify(notificationService).sendMilestoneNotification(user, 3, activityId);
   }
 
   @Test
@@ -91,6 +98,7 @@ class ActivityEventConsumerTest {
 
     verify(milestoneRepository, never()).save(any());
     verify(userRepository, never()).findById(any());
+    verify(notificationService, never()).sendMilestoneNotification(any(), anyInt(), any());
   }
 
   @Test
@@ -101,12 +109,13 @@ class ActivityEventConsumerTest {
 
     verify(milestoneRepository, never()).existsByUserIdAndMilestoneDays(any(), any());
     verify(milestoneRepository, never()).save(any());
+    verify(notificationService, never()).sendMilestoneNotification(any(), anyInt(), any());
   }
 
   @Test
   void savesCorrectMilestone_forEachThreshold() {
     for (int threshold : new int[] {7, 14, 30, 60, 100, 365}) {
-      reset(summaryService, milestoneRepository, userRepository);
+      reset(summaryService, milestoneRepository, userRepository, notificationService);
 
       when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(threshold);
       when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, threshold)).thenReturn(false);
