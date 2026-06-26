@@ -31,6 +31,8 @@ class AuthServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private RefreshTokenRepository refreshTokenRepository;
   @Mock private TokenBlacklistService tokenBlacklistService;
+  @Mock private EmailVerificationService emailVerificationService;
+  @Mock private AuditService auditService;
 
   private PasswordEncoder passwordEncoder;
   private JwtUtil jwtUtil;
@@ -53,7 +55,9 @@ class AuthServiceTest {
             refreshTokenRepository,
             passwordEncoder,
             jwtUtil,
-            tokenBlacklistService);
+            tokenBlacklistService,
+            emailVerificationService,
+            auditService);
   }
 
   @Test

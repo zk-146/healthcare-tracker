@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.SecurityConfig;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
+import com.healthcare.activitytracker.service.AccountService;
 import com.healthcare.activitytracker.service.ProfileService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
@@ -39,6 +40,7 @@ class ProfileControllerTest {
   @Autowired MockMvc mockMvc;
   @Autowired ObjectMapper objectMapper;
   @MockBean ProfileService profileService;
+  @MockBean AccountService accountService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 

@@ -33,6 +33,7 @@ class ActivityServiceTest {
   @Mock private ActivityRepository activityRepository;
   @Mock private UserRepository userRepository;
   @Mock private ActivityEventPublisher activityEventPublisher;
+  @Mock private AuditService auditService;
 
   private ActivityService activityService;
 
@@ -42,7 +43,8 @@ class ActivityServiceTest {
   @BeforeEach
   void setUp() throws Exception {
     activityService =
-        new ActivityService(activityRepository, userRepository, activityEventPublisher);
+        new ActivityService(
+            activityRepository, userRepository, activityEventPublisher, auditService);
     // Inject maxPageSize (normally set by @Value) so PageRequest.of() doesn't get size 0
     java.lang.reflect.Field f = ActivityService.class.getDeclaredField("maxPageSize");
     f.setAccessible(true);

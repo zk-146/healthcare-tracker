@@ -11,12 +11,11 @@ public class NotificationService {
 
   private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
-  public void sendMilestoneNotification(User user, int streakDays,
-      UUID triggeringActivityId) {
+  public void sendMilestoneNotification(User user, int streakDays, UUID triggeringActivityId) {
+    // The user's email (PII) is intentionally omitted from logs for HIPAA/GDPR compliance.
     log.info(
-        "NOTIFICATION userId={} email={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={}",
+        "NOTIFICATION userId={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={}",
         user.getId(),
-        user.getEmail(),
         streakDays,
         triggeringActivityId);
   }

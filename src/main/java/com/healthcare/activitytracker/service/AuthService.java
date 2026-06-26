@@ -7,18 +7,16 @@ import com.healthcare.activitytracker.model.dto.LoginRequest;
 import com.healthcare.activitytracker.model.dto.RegisterRequest;
 import com.healthcare.activitytracker.model.entity.RefreshToken;
 import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.model.enums.AuditEventType;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
 import com.healthcare.activitytracker.util.JwtUtil;
+import com.healthcare.activitytracker.util.TokenHasher;
 import io.jsonwebtoken.Claims;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
-import java.util.HexFormat;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,18 +35,24 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
+  private final EmailVerificationService emailVerificationService;
+  private final AuditService auditService;
 
   public AuthService(
       UserRepository userRepository,
       RefreshTokenRepository refreshTokenRepository,
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
-      TokenBlacklistService tokenBlacklistService) {
+      TokenBlacklistService tokenBlacklistService,
+      EmailVerificationService emailVerificationService,
+      AuditService auditService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.tokenBlacklistService = tokenBlacklistService;
+    this.emailVerificationService = emailVerificationService;
+    this.auditService = auditService;
   }
 
   /**
@@ -79,6 +83,10 @@ public class AuthService {
     user = userRepository.save(user);
     log.info("New user registered: {}", user.getId());
 
+    // Kick off email-verification (tracked, not enforced) and record the event.
+    emailVerificationService.issueFor(user);
+    auditService.record(user.getId(), AuditEventType.REGISTER);
+
     return buildAuthResponse(user);
   }
 
@@ -97,14 +105,20 @@ public class AuthService {
     User user =
         userRepository
             .findByEmail(normalizedEmail)
-            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+            .orElseThrow(
+                () -> {
+                  auditService.record(null, AuditEventType.LOGIN_FAILURE, "reason=unknown-email");
+                  return new UnauthorizedException("Invalid email or password");
+                });
 
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       log.warn("Failed login attempt for userId: {}", user.getId());
+      auditService.record(user.getId(), AuditEventType.LOGIN_FAILURE, "reason=bad-password");
       throw new UnauthorizedException("Invalid email or password");
     }
 
     log.info("User logged in: {}", user.getId());
+    auditService.record(user.getId(), AuditEventType.LOGIN_SUCCESS);
     return buildAuthResponse(user);
   }
 
@@ -176,6 +190,7 @@ public class AuthService {
             "User {} logged out: access token blacklisted, {} refresh token(s) revoked",
             userId,
             revoked);
+        auditService.record(userId, AuditEventType.LOGOUT);
       }
     } catch (Exception e) {
       // Token is already invalid — nothing to revoke
@@ -231,15 +246,10 @@ public class AuthService {
 
   /**
    * SHA-256 hash of the raw token. We store the hash in the DB rather than the raw JWT to limit
-   * exposure if the database is compromised.
+   * exposure if the database is compromised. Delegates to {@link TokenHasher} (kept as a static
+   * method for existing callers/tests).
    */
   static String sha256(String input) {
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-      return HexFormat.of().formatHex(hash);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 not available", e);
-    }
+    return TokenHasher.sha256(input);
   }
 }

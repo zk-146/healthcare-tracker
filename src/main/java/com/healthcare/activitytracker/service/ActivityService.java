@@ -7,6 +7,7 @@ import com.healthcare.activitytracker.model.entity.Activity;
 import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.model.enums.ActivitySource;
 import com.healthcare.activitytracker.model.enums.ActivityType;
+import com.healthcare.activitytracker.model.enums.AuditEventType;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
@@ -35,14 +36,17 @@ public class ActivityService {
   private final ActivityRepository activityRepository;
   private final UserRepository userRepository;
   private final ActivityEventPublisher activityEventPublisher;
+  private final AuditService auditService;
 
   public ActivityService(
       ActivityRepository activityRepository,
       UserRepository userRepository,
-      ActivityEventPublisher activityEventPublisher) {
+      ActivityEventPublisher activityEventPublisher,
+      AuditService auditService) {
     this.activityRepository = activityRepository;
     this.userRepository = userRepository;
     this.activityEventPublisher = activityEventPublisher;
+    this.auditService = auditService;
   }
 
   /**
@@ -86,6 +90,7 @@ public class ActivityService {
         activity.getSource());
 
     activityEventPublisher.publishActivityCreated(toEvent(activity));
+    auditService.record(userId, AuditEventType.ACTIVITY_CREATE, "activityId=" + activity.getId());
 
     return toResponse(activity);
   }
@@ -194,6 +199,7 @@ public class ActivityService {
 
     activity = activityRepository.save(activity);
     log.info("Activity updated: {}", activity.getId());
+    auditService.record(userId, AuditEventType.ACTIVITY_UPDATE, "activityId=" + activityId);
 
     return toResponse(activity);
   }
@@ -215,6 +221,7 @@ public class ActivityService {
 
     activityRepository.delete(activity);
     log.info("Activity deleted: {}", activityId);
+    auditService.record(userId, AuditEventType.ACTIVITY_DELETE, "activityId=" + activityId);
   }
 
   private ActivityResponse toResponse(Activity activity) {

@@ -35,6 +35,14 @@ public class User {
   @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
+  /**
+   * Whether the user has confirmed ownership of their email address. Tracked but not currently
+   * enforced at login (see {@code EmailVerificationService}).
+   */
+  @Builder.Default
+  @Column(name = "email_verified", nullable = false)
+  private boolean emailVerified = false;
+
   @Column(name = "full_name", nullable = false, length = 150)
   private String fullName;
 

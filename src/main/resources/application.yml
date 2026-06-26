@@ -94,6 +94,10 @@ app:
     refresh-token-expiry-ms: 604800000
     issuer: activity-tracker
     audience: activity-tracker-users
+  tokens:
+    # One-time token lifetimes for the email-verification and password-reset flows.
+    email-verification-expiry-ms: 86400000 # 24 hours
+    password-reset-expiry-ms: 3600000 # 1 hour
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
   rate-limit:

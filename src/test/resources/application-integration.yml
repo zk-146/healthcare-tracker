@@ -1,0 +1,62 @@
+# Integration-test profile: full Spring context against a real PostgreSQL container
+# (datasource supplied by Testcontainers @ServiceConnection) with Flyway migrations
+# applied. Exercises the production schema that the H2-based unit tests cannot.
+
+spring:
+  jpa:
+    hibernate:
+      # Validate the entity mappings against the Flyway-migrated schema.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # Redis is unavailable in tests — the app falls back to in-memory stores.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+  kafka:
+    # No broker in integration tests. The publisher swallows send failures and the
+    # admin/consumer are non-fatal, so the context still starts. Timeouts are bounded
+    # low (applied to producer, consumer and admin clients) so neither startup nor the
+    # send-and-forget publish blocks on the default 30–60s waits.
+    bootstrap-servers: localhost:9092
+    listener:
+      missing-topics-fatal: false
+    properties:
+      request.timeout.ms: 2000
+      default.api.timeout.ms: 3000
+    producer:
+      properties:
+        max.block.ms: 2000
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    secret: integration-test-secret-key-must-be-at-least-32-chars
+    refresh-secret: integration-test-refresh-secret-key-must-be-at-least-32-chars
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+    issuer: activity-tracker
+    audience: activity-tracker-users
+  tokens:
+    email-verification-expiry-ms: 86400000
+    password-reset-expiry-ms: 3600000
+  cors:
+    allowed-origins: http://localhost:3000
+  rate-limit:
+    auth-requests-per-minute: 1000
+    api-requests-per-minute: 1000

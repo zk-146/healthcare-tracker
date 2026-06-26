@@ -4,6 +4,7 @@ import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.model.enums.AuditEventType;
 import com.healthcare.activitytracker.repository.UserRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -13,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProfileService {
 
   private final UserRepository userRepository;
+  private final AuditService auditService;
 
-  public ProfileService(UserRepository userRepository) {
+  public ProfileService(UserRepository userRepository, AuditService auditService) {
     this.userRepository = userRepository;
+    this.auditService = auditService;
   }
 
   /**
@@ -32,6 +35,7 @@ public class ProfileService {
         userRepository
             .findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    auditService.record(userId, AuditEventType.PROFILE_VIEW);
     return toResponse(user);
   }
 
@@ -59,6 +63,7 @@ public class ProfileService {
     if (request.getWeightKg() != null) user.setWeightKg(request.getWeightKg());
 
     user = userRepository.save(user);
+    auditService.record(userId, AuditEventType.PROFILE_UPDATE);
     return toResponse(user);
   }
 

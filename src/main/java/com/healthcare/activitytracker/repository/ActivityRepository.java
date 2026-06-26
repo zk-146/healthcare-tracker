@@ -33,6 +33,13 @@ public interface ActivityRepository
 
   Optional<Activity> findByIdAndUserId(UUID id, UUID userId);
 
+  /** All activities for a user, newest first — used by the data-export endpoint. */
+  List<Activity> findByUserIdOrderByStartedAtDesc(UUID userId);
+
+  @org.springframework.data.jpa.repository.Modifying
+  @Query("DELETE FROM Activity a WHERE a.user.id = :userId")
+  int deleteByUserId(@Param("userId") UUID userId);
+
   @Query(
       "SELECT a FROM Activity a WHERE a.user.id = :userId "
           + "AND a.startedAt >= :from AND a.startedAt <= :to "

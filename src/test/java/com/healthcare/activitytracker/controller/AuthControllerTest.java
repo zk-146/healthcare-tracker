@@ -12,6 +12,8 @@ import com.healthcare.activitytracker.model.dto.LoginRequest;
 import com.healthcare.activitytracker.model.dto.RefreshRequest;
 import com.healthcare.activitytracker.model.dto.RegisterRequest;
 import com.healthcare.activitytracker.service.AuthService;
+import com.healthcare.activitytracker.service.EmailVerificationService;
+import com.healthcare.activitytracker.service.PasswordResetService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.util.UUID;
@@ -32,6 +34,8 @@ class AuthControllerTest {
   @Autowired MockMvc mockMvc;
   @Autowired ObjectMapper objectMapper;
   @MockBean AuthService authService;
+  @MockBean EmailVerificationService emailVerificationService;
+  @MockBean PasswordResetService passwordResetService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
