@@ -33,21 +33,34 @@ public class JwtSecretValidator implements ApplicationRunner {
     this.environment = environment;
   }
 
+  /**
+   * Profiles in which booting with the built-in default secrets is tolerated (with a warning).
+   * Anything else — including running with no active profile at all — is treated as a potentially
+   * production-facing deployment and refuses to start, so that the known, repo-committed signing
+   * keys can never be used to mint forgeable tokens by accident.
+   */
+  private static final Set<String> DEV_PROFILES = Set.of("dev", "test", "local");
+
   @Override
   public void run(ApplicationArguments args) {
-    boolean isProduction = Arrays.asList(environment.getActiveProfiles()).contains("prod");
+    boolean explicitDevOrTest =
+        Arrays.stream(environment.getActiveProfiles())
+            .anyMatch(p -> DEV_PROFILES.contains(p.toLowerCase(java.util.Locale.ROOT)));
     boolean hasInsecureSecret = INSECURE_DEFAULTS.contains(jwtSecret);
     boolean hasInsecureRefresh = INSECURE_DEFAULTS.contains(jwtRefreshSecret);
 
     if (hasInsecureSecret || hasInsecureRefresh) {
       String message =
-          "JWT secrets are set to insecure default values. "
-              + "Set JWT_SECRET and JWT_REFRESH_SECRET environment variables.";
-      if (isProduction) {
+          "JWT secrets are set to insecure, publicly-known default values. "
+              + "Set the JWT_SECRET and JWT_REFRESH_SECRET environment variables.";
+      if (!explicitDevOrTest) {
         throw new IllegalStateException(
             "FATAL: "
                 + message
-                + " Application cannot start in 'prod' profile with default secrets.");
+                + " The application refuses to start with default secrets unless an explicit "
+                + "'dev', 'test', or 'local' profile is active (active profiles: "
+                + Arrays.toString(environment.getActiveProfiles())
+                + ").");
       }
       log.warn("WARNING: {} This is acceptable for local development only.", message);
     }

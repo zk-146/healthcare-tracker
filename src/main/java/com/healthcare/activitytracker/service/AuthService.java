@@ -38,6 +38,14 @@ public class AuthService {
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
 
+  /**
+   * A pre-computed password hash used to perform a "dummy" verification when the supplied email
+   * does not exist. Running the same expensive hashing work on both the found and not-found paths
+   * keeps login response times indistinguishable, preventing email/user enumeration via timing
+   * analysis.
+   */
+  private final String dummyPasswordHash;
+
   public AuthService(
       UserRepository userRepository,
       RefreshTokenRepository refreshTokenRepository,
@@ -49,6 +57,8 @@ public class AuthService {
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.tokenBlacklistService = tokenBlacklistService;
+    // Computed once with the same encoder (and cost factor) used for real password hashes.
+    this.dummyPasswordHash = passwordEncoder.encode("invalid-account-placeholder-password");
   }
 
   /**
@@ -94,11 +104,16 @@ public class AuthService {
   public AuthResponse login(LoginRequest request) {
     String normalizedEmail = request.getEmail().strip().toLowerCase(Locale.ROOT);
 
-    User user =
-        userRepository
-            .findByEmail(normalizedEmail)
-            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+    var userOpt = userRepository.findByEmail(normalizedEmail);
+    if (userOpt.isEmpty()) {
+      // Perform a dummy hash comparison so the not-found path costs the same as a wrong-password
+      // path. This prevents attackers from enumerating registered emails via response timing.
+      passwordEncoder.matches(request.getPassword(), dummyPasswordHash);
+      log.warn("Failed login attempt for unknown email");
+      throw new UnauthorizedException("Invalid email or password");
+    }
 
+    User user = userOpt.get();
     if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       log.warn("Failed login attempt for userId: {}", user.getId());
       throw new UnauthorizedException("Invalid email or password");

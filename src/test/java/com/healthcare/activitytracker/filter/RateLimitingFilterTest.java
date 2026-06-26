@@ -7,6 +7,8 @@ import static org.mockito.Mockito.*;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -17,7 +19,7 @@ class RateLimitingFilterTest {
 
   @BeforeEach
   void setUp() {
-    filter = new RateLimitingFilter();
+    filter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(filter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(filter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(filter, "trustedProxiesConfig", "");
@@ -50,7 +52,7 @@ class RateLimitingFilterTest {
   @Test
   void apiRequest_exceedingLimit_returns429() throws Exception {
     // Set a very tight limit of 1 request per minute
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -77,7 +79,7 @@ class RateLimitingFilterTest {
 
   @Test
   void authEndpoint_exceedingAuthLimit_returns429() throws Exception {
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -104,7 +106,7 @@ class RateLimitingFilterTest {
     // With no trusted proxies, X-Forwarded-For must be ignored.
     // Two requests from the same "real" IP (even with different X-Forwarded-For headers)
     // should share the same bucket.
-    RateLimitingFilter tightFilter = new RateLimitingFilter();
+    RateLimitingFilter tightFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(tightFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(tightFilter, "apiRequestsPerMinute", 1);
     ReflectionTestUtils.setField(tightFilter, "trustedProxiesConfig", "");
@@ -130,8 +132,89 @@ class RateLimitingFilterTest {
   }
 
   @Test
+  void redisBacked_withinLimit_passesThrough() throws Exception {
+    StringRedisTemplate redis = mock(StringRedisTemplate.class);
+    ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+    when(redis.opsForValue()).thenReturn(valueOps);
+    // First request in the window returns count = 1 (within a limit of 2)
+    when(valueOps.increment(any())).thenReturn(1L);
+
+    RateLimitingFilter redisFilter = new RateLimitingFilter(redis);
+    ReflectionTestUtils.setField(redisFilter, "authRequestsPerMinute", 2);
+    ReflectionTestUtils.setField(redisFilter, "apiRequestsPerMinute", 60);
+    ReflectionTestUtils.setField(redisFilter, "trustedProxiesConfig", "");
+    redisFilter.init();
+
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+    request.setRemoteAddr("10.1.1.1");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    redisFilter.doFilterInternal(request, response, chain);
+
+    verify(chain, times(1)).doFilter(request, response);
+    // TTL is set on the first hit of each window (login touches both the auth and api limiters).
+    verify(redis, atLeastOnce()).expire(any(), any());
+  }
+
+  @Test
+  void redisBacked_exceedingLimit_returns429() throws Exception {
+    StringRedisTemplate redis = mock(StringRedisTemplate.class);
+    ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+    when(redis.opsForValue()).thenReturn(valueOps);
+    // Count exceeds the limit of 1
+    when(valueOps.increment(any())).thenReturn(2L);
+
+    RateLimitingFilter redisFilter = new RateLimitingFilter(redis);
+    ReflectionTestUtils.setField(redisFilter, "authRequestsPerMinute", 1);
+    ReflectionTestUtils.setField(redisFilter, "apiRequestsPerMinute", 60);
+    ReflectionTestUtils.setField(redisFilter, "trustedProxiesConfig", "");
+    redisFilter.init();
+
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+    request.setRemoteAddr("10.1.1.2");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    redisFilter.doFilterInternal(request, response, chain);
+
+    verify(chain, never()).doFilter(any(), any());
+    assertThat(response.getStatus()).isEqualTo(429);
+  }
+
+  @Test
+  void redisFailure_fallsBackToInMemory() throws Exception {
+    StringRedisTemplate redis = mock(StringRedisTemplate.class);
+    // Simulate Redis being down — opsForValue().increment throws
+    when(redis.opsForValue()).thenThrow(new RuntimeException("connection refused"));
+
+    RateLimitingFilter redisFilter = new RateLimitingFilter(redis);
+    ReflectionTestUtils.setField(redisFilter, "authRequestsPerMinute", 1);
+    ReflectionTestUtils.setField(redisFilter, "apiRequestsPerMinute", 1);
+    ReflectionTestUtils.setField(redisFilter, "trustedProxiesConfig", "");
+    redisFilter.init();
+
+    String ip = "10.1.1.3";
+    FilterChain chain = mock(FilterChain.class);
+
+    // First request still served via the in-memory fallback bucket
+    MockHttpServletRequest req1 = new MockHttpServletRequest("GET", "/api/v1/activities");
+    req1.setRemoteAddr(ip);
+    MockHttpServletResponse res1 = new MockHttpServletResponse();
+    redisFilter.doFilterInternal(req1, res1, chain);
+    assertThat(res1.getStatus()).isEqualTo(200);
+
+    // Second request hits the in-memory limit of 1 → 429 (fallback still enforces limits)
+    MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/v1/activities");
+    req2.setRemoteAddr(ip);
+    MockHttpServletResponse res2 = new MockHttpServletResponse();
+    redisFilter.doFilterInternal(req2, res2, chain);
+    assertThat(res2.getStatus()).isEqualTo(429);
+  }
+
+  @Test
   void xForwardedFor_trusted_whenProxyConfigured() throws Exception {
-    RateLimitingFilter proxyFilter = new RateLimitingFilter();
+    RateLimitingFilter proxyFilter = new RateLimitingFilter(null);
     ReflectionTestUtils.setField(proxyFilter, "authRequestsPerMinute", 10);
     ReflectionTestUtils.setField(proxyFilter, "apiRequestsPerMinute", 60);
     ReflectionTestUtils.setField(proxyFilter, "trustedProxiesConfig", "10.0.0.1");

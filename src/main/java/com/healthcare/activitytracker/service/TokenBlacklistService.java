@@ -48,21 +48,21 @@ public class TokenBlacklistService {
    */
   public void revoke(String token, long expiryMs) {
     String key = hashToken(token);
+    // Always record locally as well as in Redis. This is cheap (the entry self-expires and is
+    // periodically evicted) and means that if a later Redis *read* fails transiently, the same
+    // instance can still recognise a token it revoked rather than failing open.
+    localBlacklist.put(key, System.currentTimeMillis() + expiryMs);
     if (redisTemplate != null) {
       try {
         redisTemplate
             .opsForValue()
             .set(REDIS_KEY_PREFIX + key, "revoked", Duration.ofMillis(expiryMs));
-        log.debug("Token revoked in Redis");
+        log.debug("Token revoked in Redis (and local cache)");
         return;
       } catch (Exception e) {
-        log.warn(
-            "Redis unavailable for token revocation, falling back to in-memory: {}",
-            e.getMessage());
+        log.warn("Redis unavailable for token revocation, kept in-memory only: {}", e.getMessage());
       }
     }
-    // Fallback to in-memory
-    localBlacklist.put(key, System.currentTimeMillis() + expiryMs);
     log.debug("Token revoked in-memory, blacklist size={}", localBlacklist.size());
   }
 
@@ -72,14 +72,21 @@ public class TokenBlacklistService {
     if (redisTemplate != null) {
       try {
         Boolean exists = redisTemplate.hasKey(REDIS_KEY_PREFIX + key);
-        return Boolean.TRUE.equals(exists);
+        if (Boolean.TRUE.equals(exists)) {
+          return true;
+        }
+        // Redis says not revoked: still consult the local cache as a safety net for revocations
+        // that may have been recorded only locally during a prior Redis outage.
       } catch (Exception e) {
         log.warn(
             "Redis unavailable for revocation check, falling back to in-memory: {}",
             e.getMessage());
       }
     }
-    // Fallback to in-memory
+    return isRevokedLocally(key);
+  }
+
+  private boolean isRevokedLocally(String key) {
     Long expiresAt = localBlacklist.get(key);
     if (expiresAt == null) {
       return false;

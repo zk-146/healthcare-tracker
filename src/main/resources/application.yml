@@ -97,8 +97,10 @@ app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
   rate-limit:
-    auth-requests-per-minute: 300
-    api-requests-per-minute: 1000
+    # Safe-by-default limits so brute-force protection does not depend on the 'prod' profile
+    # being active. The 'prod' profile tightens these further; 'test' loosens them.
+    auth-requests-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:20}
+    api-requests-per-minute: ${RATE_LIMIT_API_PER_MINUTE:100}
   security:
     # Comma-separated list of trusted reverse-proxy IPs.
     # Only these IPs may set X-Forwarded-For. Leave empty to disable header trust.

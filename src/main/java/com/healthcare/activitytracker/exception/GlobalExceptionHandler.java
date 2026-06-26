@@ -67,10 +67,18 @@ public class GlobalExceptionHandler {
         HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
   }
 
+  @ExceptionHandler(InvalidRequestException.class)
+  public ResponseEntity<Map<String, Object>> handleInvalidRequest(InvalidRequestException ex) {
+    // Message is intentionally client-safe.
+    log.warn("Invalid request: {}", ex.getMessage());
+    return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+    // The message may originate from library internals — log it, but do not leak it to the client.
     log.warn("Illegal argument: {}", ex.getMessage());
-    return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    return buildResponse(HttpStatus.BAD_REQUEST, "Invalid request");
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)

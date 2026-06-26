@@ -1,5 +1,6 @@
 package com.healthcare.activitytracker.service;
 
+import com.healthcare.activitytracker.exception.InvalidRequestException;
 import com.healthcare.activitytracker.model.dto.SummaryResponse;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.projection.ActivityTypeSummaryProjection;
@@ -37,17 +38,17 @@ public class SummaryService {
    * @param to inclusive end date
    * @param zone the user's timezone, used for streak boundary calculations
    * @return the aggregated summary
-   * @throws IllegalArgumentException if {@code from} is after {@code to}, or the range exceeds
+   * @throws InvalidRequestException if {@code from} is after {@code to}, or the range exceeds
    *     {@code app.summary.max-range-days}
    */
   @Transactional(readOnly = true)
   public SummaryResponse getSummary(UUID userId, LocalDate from, LocalDate to, ZoneId zone) {
     long rangeDays = ChronoUnit.DAYS.between(from, to);
     if (rangeDays < 0) {
-      throw new IllegalArgumentException("'from' date must not be after 'to' date");
+      throw new InvalidRequestException("'from' date must not be after 'to' date");
     }
     if (rangeDays > maxRangeDays) {
-      throw new IllegalArgumentException(
+      throw new InvalidRequestException(
           "Date range cannot exceed " + maxRangeDays + " days (requested " + rangeDays + ")");
     }
     LocalDateTime fromDt = from.atStartOfDay();
