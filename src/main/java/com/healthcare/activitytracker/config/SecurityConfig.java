@@ -61,6 +61,10 @@ public class SecurityConfig {
                         "/api/v1/auth/refresh",
                         "/api/v1/auth/logout")
                     .permitAll()
+                    // OAuth redirect target: Google sends the browser here with no JWT, so it
+                    // cannot require authentication. It is secured instead by the one-time state.
+                    .requestMatchers("/api/v1/integrations/google-health/callback")
+                    .permitAll()
                     // Only /actuator/health is public; all other actuator endpoints require
                     // authentication
                     .requestMatchers("/actuator/health")
