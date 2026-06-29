@@ -33,6 +33,9 @@ public interface ActivityRepository
 
   Optional<Activity> findByIdAndUserId(UUID id, UUID userId);
 
+  /** True if a workout from the given external source record has already been imported. */
+  boolean existsByUserIdAndExternalId(UUID userId, String externalId);
+
   @Query(
       "SELECT a FROM Activity a WHERE a.user.id = :userId "
           + "AND a.startedAt >= :from AND a.startedAt <= :to "
