@@ -36,6 +36,11 @@ public class StreakMilestone {
   @Column(name = "achieved_at", nullable = false)
   private LocalDateTime achievedAt;
 
+  /**
+   * ID of the activity whose creation triggered this milestone. Intentionally <em>not</em> a
+   * foreign key: milestones are historical records and must survive deletion of the referenced
+   * activity, so a dangling ID here is expected and harmless.
+   */
   @Column(name = "triggering_activity_id", nullable = false)
   private UUID triggeringActivityId;
 
