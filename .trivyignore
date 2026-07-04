@@ -1,0 +1,10 @@
+# Trivy vulnerability ignore list.
+#
+# Add entries here only for confirmed false positives or vulnerabilities that
+# are genuinely not exploitable in this image (e.g. the vulnerable code path is
+# never reached). Do NOT use this file to silence real findings — CRITICAL
+# severities fail the "docker" CI job by design (see .github/workflows/ci.yml).
+#
+# Format: one CVE (or GHSA) ID per line, optionally with a trailing comment.
+# Example:
+# CVE-2023-12345 # base-image glibc CVE, not reachable — process never parses untrusted locale data
