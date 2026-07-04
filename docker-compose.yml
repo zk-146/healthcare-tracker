@@ -4,22 +4,38 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/activity_tracker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/activity_tracker
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-local-dev-password}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-for-local-testing-must-be-at-least-32-chars}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-for-local-testing-at-least-32-chars}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_started
       kafka:
         condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: activity_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d activity_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -63,3 +79,6 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+volumes:
+  postgres-data:

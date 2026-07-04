@@ -92,6 +92,19 @@ class JwtAuthenticationFilterTest {
   }
 
   @Test
+  void shouldNotFilter_returnsTrue_forLogoutPath() {
+    // Logout must stay reachable with an invalid/expired token (idempotent 204 contract)
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+    request.setRequestURI("/api/v1/auth/logout");
+
+    assertThat(filter.shouldNotFilter(request)).isTrue();
+
+    MockHttpServletRequest other = new MockHttpServletRequest("GET", "/api/v1/activities");
+    other.setRequestURI("/api/v1/activities");
+    assertThat(filter.shouldNotFilter(other)).isFalse();
+  }
+
+  @Test
   void doFilterInternal_returns401_whenTokenIsRevoked() throws Exception {
     UUID userId = UUID.randomUUID();
     String token = jwtUtil.generateAccessToken(userId, "test@example.com");

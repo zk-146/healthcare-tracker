@@ -2,14 +2,17 @@ package com.healthcare.activitytracker.controller;
 
 import com.healthcare.activitytracker.model.dto.AuthResponse;
 import com.healthcare.activitytracker.model.dto.LoginRequest;
+import com.healthcare.activitytracker.model.dto.PasswordChangeRequest;
 import com.healthcare.activitytracker.model.dto.RefreshRequest;
 import com.healthcare.activitytracker.model.dto.RegisterRequest;
 import com.healthcare.activitytracker.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Authentication", description = "Register, login, token refresh and logout")
@@ -47,6 +50,19 @@ public class AuthController {
   public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
     AuthResponse response = authService.refresh(request.getRefreshToken());
     return ResponseEntity.ok(response);
+  }
+
+  /**
+   * Changes the authenticated user's password. All refresh tokens are revoked, so other sessions
+   * must log in again with the new password.
+   */
+  @Operation(summary = "Change the current user's password (revokes all refresh tokens)")
+  @PostMapping("/change-password")
+  public ResponseEntity<Void> changePassword(
+      Authentication auth, @Valid @RequestBody PasswordChangeRequest request) {
+    UUID userId = (UUID) auth.getPrincipal();
+    authService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword());
+    return ResponseEntity.noContent().build();
   }
 
   /**

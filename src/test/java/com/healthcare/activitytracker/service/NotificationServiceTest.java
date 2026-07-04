@@ -26,10 +26,7 @@ class NotificationServiceTest {
             .fullName("Test User")
             .build();
 
-    assertThatCode(
-            () ->
-                notificationService.sendMilestoneNotification(
-                    user, 7, UUID.randomUUID()))
+    assertThatCode(() -> notificationService.sendMilestoneNotification(user, 7, UUID.randomUUID()))
         .doesNotThrowAnyException();
   }
 }

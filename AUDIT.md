@@ -21,6 +21,40 @@ worth fixing.
 
 ---
 
+## Resolution status (updated 2026-07-04)
+
+All findings have been addressed on this branch.
+
+| Finding | Status | Resolution |
+|---|---|---|
+| H1 CORS header | **Fixed** | `X-User-Timezone` added to allowed headers |
+| H2 Kafka DLQ | **Fixed** | Topic bean renamed to `activity-events.DLT` (matches recoverer default, 3 partitions) |
+| H3 PII in logs | **Fixed** | Email removed from notification log |
+| H4 Filter wiring | **Fixed** | `FilterConfig` registers rate-limit (-102) and logging (-101) ahead of the security chain (-100), disables the JWT filter's duplicate servlet registration; `RequestLoggingFilter` now owns the MDC lifecycle; JWT filter skips `/logout` via `shouldNotFilter` so the idempotent-204 contract holds |
+| M1 Reuse detection | **Fixed** | Presenting a revoked refresh token revokes the user's whole token family |
+| M2 Refresh race | **Fixed** | Rotation is an atomic conditional `UPDATE` (`revokeByTokenHash`); losing the race is treated as reuse |
+| M3 Blacklist fail-open | **Fixed (mitigated)** | Dual-write: every revocation also lands in the local map, so this instance can never un-revoke its own tokens on Redis outage; cross-instance gaps during an outage now log at ERROR. Full fail-closed was rejected as an availability tradeoff |
+| M4 Per-instance rate limit | **Documented** | Corrected pom comment; limitation documented in `RateLimitingFilter` javadoc with the bucket4j-redis upgrade path |
+| M5 Advisory CI scans | **Fixed** | OWASP job now enforcing (fails on CVSS ≥ 7); Trivy fails on CRITICAL; CodeQL stays artifact-only (upload deliberately removed earlier — code scanning not enabled on the repo) |
+| M6 H2-only tests | **Fixed** | `ActivityRepositoryPostgresTest` (Testcontainers + Flyway + `ddl-auto: validate`) exercises null-param binding and the `CAST` query on real Postgres; skipped without Docker, runs in CI |
+| M7 Account lifecycle | **Partially fixed** | Added `POST /api/v1/auth/change-password` (revokes all refresh tokens; also rate-limited as an auth endpoint) and `DELETE /api/v1/profile` (full data erasure + token revocation). Email verification remains a roadmap item |
+| M8 Timezone inconsistency | **Fixed (documented)** | All event/audit timestamps now explicit UTC; UTC milestone semantics documented in the consumer with the propagation path if exact agreement is ever required |
+| L1 YAML nesting | **Fixed** | `show-sql`/Hibernate props moved to `spring.jpa`; dialect dropped (auto-detected) |
+| L2 CORS origins | **Fixed** | Origins trimmed and blanks filtered |
+| L3 Swagger unreachable | **Fixed** | Docs paths permitted; springdoc disabled entirely in prod |
+| L4 Email enumeration | **Documented** | Accepted tradeoff recorded in `AuthService.register` (rate-limited; opaque flow needs email verification) |
+| L5 Dead blacklist write | **Fixed** | Removed; refresh revocation is DB-authoritative |
+| L6 Secret validation | **Fixed** | Startup now also rejects identical access/refresh secrets (fatal in prod) |
+| L7 Unused repo methods | **Fixed** | Removed; test migrated to `findByFilters` |
+| L8 Milestone FK | **Documented** | Intentional no-FK recorded on the entity field |
+| L9 Streak query cost | **Documented** | Cost note + caching/windowed-SQL suggestion in `SummaryService` |
+| L10 Compose postgres | **Fixed** | `postgres:16-alpine` service with healthcheck and volume; app wired to it |
+
+Verification: 95 tests pass (3 Postgres tests skip without Docker), `mvn verify`
+(Spotless + Checkstyle) green.
+
+---
+
 ## High
 
 ### H1. CORS blocks the `X-User-Timezone` header for browser clients
