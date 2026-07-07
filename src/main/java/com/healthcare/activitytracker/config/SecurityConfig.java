@@ -65,6 +65,10 @@ public class SecurityConfig {
                     // cannot require authentication. It is secured instead by the one-time state.
                     .requestMatchers("/api/v1/integrations/google-health/callback")
                     .permitAll()
+                    // API docs are public; springdoc is disabled in the prod profile,
+                    // where these paths return 404
+                    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll()
                     // Only /actuator/health is public; all other actuator endpoints require
                     // authentication
                     .requestMatchers("/actuator/health")
@@ -89,9 +93,14 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+    config.setAllowedOrigins(
+        Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isEmpty())
+            .toList());
     config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+    // X-User-Timezone is read by the summary endpoints for streak boundary calculations
+    config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-User-Timezone"));
     config.setAllowCredentials(true);
     config.setMaxAge(3600L);
 

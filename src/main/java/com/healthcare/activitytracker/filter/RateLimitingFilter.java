@@ -17,24 +17,36 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Per-IP rate limiting. Registered ahead of the Spring Security chain (see {@code FilterConfig}) so
+ * that even requests the security layer would reject consume rate budget.
+ *
+ * <p><strong>Scope:</strong> buckets are in-memory and per-instance. With N replicas behind a load
+ * balancer the effective limit is up to N x the configured value. If strict global limits are
+ * required, replace the bucket maps with a distributed bucket4j backend (e.g. {@code
+ * bucket4j-redis}) — Redis is already part of the deployment for the token blacklist.
+ */
 @Component
-@Order(0)
 public class RateLimitingFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(RateLimitingFilter.class);
 
   /**
    * Auth endpoints that receive stricter rate-limiting protection. Includes /refresh to prevent
-   * replay attacks with stolen refresh tokens.
+   * replay attacks with stolen refresh tokens and /change-password to slow down current-password
+   * brute forcing from a hijacked session.
    */
   private static final Set<String> AUTH_RATE_LIMITED_URIS =
-      Set.of("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh");
+      Set.of(
+          "/api/v1/auth/login",
+          "/api/v1/auth/register",
+          "/api/v1/auth/refresh",
+          "/api/v1/auth/change-password");
 
   @Value("${app.rate-limit.auth-requests-per-minute:10}")
   private int authRequestsPerMinute;
@@ -79,6 +91,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       @NonNull HttpServletResponse response,
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
+
+    // CORS preflights are unauthenticated browser plumbing; since this filter now runs before
+    // the security chain's CORS handling, exempt them so preflight bursts don't starve the
+    // actual API requests that follow.
+    if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+      filterChain.doFilter(request, response);
+      return;
+    }
 
     String uri = request.getRequestURI();
     String clientIp = getClientIp(request);

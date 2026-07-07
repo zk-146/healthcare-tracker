@@ -14,7 +14,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,13 +21,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Validates Bearer access tokens and populates the security context.
+ *
+ * <p>Runs only inside the Spring Security filter chain (see {@code SecurityConfig}); the automatic
+ * servlet registration is disabled in {@code FilterConfig}. MDC lifecycle ({@code requestId},
+ * clearing) is owned by {@code RequestLoggingFilter}, which wraps the security chain; this filter
+ * only contributes the {@code userId} entry.
+ */
 @Component
-@Order(2)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
   private static final String AUTH_HEADER = "Authorization";
   private static final String BEARER_PREFIX = "Bearer ";
+  private static final String LOGOUT_PATH = "/api/v1/auth/logout";
 
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
@@ -41,15 +48,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Logout must remain reachable with an expired or otherwise invalid token — the endpoint is
+   * documented as idempotent (204 regardless of token state) and extracts the token itself.
+   */
+  @Override
+  protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+    return LOGOUT_PATH.equals(request.getRequestURI());
+  }
+
   @Override
   protected void doFilterInternal(
       @NonNull HttpServletRequest request,
       @NonNull HttpServletResponse response,
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
-
-    String requestId = UUID.randomUUID().toString().substring(0, 8);
-    MDC.put("requestId", requestId);
 
     String header = request.getHeader(AUTH_HEADER);
 
@@ -88,11 +101,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
     }
 
-    try {
-      filterChain.doFilter(request, response);
-    } finally {
-      MDC.clear();
-    }
+    filterChain.doFilter(request, response);
   }
 
   private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {

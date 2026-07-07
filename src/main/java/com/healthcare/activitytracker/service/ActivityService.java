@@ -14,6 +14,7 @@ import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +155,8 @@ public class ActivityService {
     return ActivityCreatedEvent.builder()
         .eventId(UUID.randomUUID())
         .eventType("ACTIVITY_CREATED")
-        .occurredAt(LocalDateTime.now())
+        // All event/audit timestamps use UTC regardless of the server's default zone
+        .occurredAt(LocalDateTime.now(ZoneOffset.UTC))
         .activityId(activity.getId())
         .userId(activity.getUser().getId())
         .activityType(activity.getActivityType())

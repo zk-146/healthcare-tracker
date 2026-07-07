@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
  * Token blacklist for revoked JWTs.
  *
  * <p>Uses Redis when available so that revocations are visible across all application instances.
- * Falls back to a local in-memory {@link ConcurrentHashMap} if Redis is not configured (e.g. in
- * local development or tests).
+ * Every revocation is <em>also</em> written to a local in-memory {@link ConcurrentHashMap}, so a
+ * Redis outage can never resurrect a token that was revoked through this instance. Revocations
+ * recorded by <em>other</em> instances are unavoidably invisible while Redis is down (fail-open for
+ * cross-instance checks only); such failures are logged at ERROR level so they page.
  */
 @Component
 public class TokenBlacklistService {
@@ -48,38 +50,47 @@ public class TokenBlacklistService {
    */
   public void revoke(String token, long expiryMs) {
     String key = hashToken(token);
+    // Always record locally first — this instance must never un-revoke a token it revoked,
+    // even if the Redis write below fails.
+    localBlacklist.put(key, System.currentTimeMillis() + expiryMs);
     if (redisTemplate != null) {
       try {
         redisTemplate
             .opsForValue()
             .set(REDIS_KEY_PREFIX + key, "revoked", Duration.ofMillis(expiryMs));
-        log.debug("Token revoked in Redis");
-        return;
+        log.debug("Token revoked in Redis and locally");
       } catch (Exception e) {
-        log.warn(
-            "Redis unavailable for token revocation, falling back to in-memory: {}",
+        log.error(
+            "Redis unavailable for token revocation — revocation is only effective on this "
+                + "instance until Redis recovers: {}",
             e.getMessage());
       }
     }
-    // Fallback to in-memory
-    localBlacklist.put(key, System.currentTimeMillis() + expiryMs);
-    log.debug("Token revoked in-memory, blacklist size={}", localBlacklist.size());
   }
 
   /** Returns true if the token has been explicitly revoked. */
   public boolean isRevoked(String token) {
     String key = hashToken(token);
+    // Local check first: authoritative for revocations made through this instance and
+    // resilient to Redis outages.
+    if (isLocallyRevoked(key)) {
+      return true;
+    }
     if (redisTemplate != null) {
       try {
         Boolean exists = redisTemplate.hasKey(REDIS_KEY_PREFIX + key);
         return Boolean.TRUE.equals(exists);
       } catch (Exception e) {
-        log.warn(
-            "Redis unavailable for revocation check, falling back to in-memory: {}",
+        log.error(
+            "Redis unavailable for revocation check — revocations from other instances "
+                + "cannot be seen until Redis recovers: {}",
             e.getMessage());
       }
     }
-    // Fallback to in-memory
+    return false;
+  }
+
+  private boolean isLocallyRevoked(String key) {
     Long expiresAt = localBlacklist.get(key);
     if (expiresAt == null) {
       return false;

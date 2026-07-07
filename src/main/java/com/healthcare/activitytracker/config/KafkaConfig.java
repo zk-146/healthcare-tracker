@@ -40,15 +40,20 @@ public class KafkaConfig {
     return TopicBuilder.name(activityEventsTopic).partitions(3).replicas(1).build();
   }
 
+  /**
+   * Dead-letter topic. {@link DeadLetterPublishingRecoverer} publishes to {@code <topic>.DLT} on
+   * the <em>same partition</em> as the failed record by default, so this topic must exist with at
+   * least as many partitions as the source topic.
+   */
   @Bean
-  public NewTopic activityEventsDlqTopic() {
-    return TopicBuilder.name(activityEventsTopic + ".DLQ").partitions(3).replicas(1).build();
+  public NewTopic activityEventsDltTopic() {
+    return TopicBuilder.name(activityEventsTopic + ".DLT").partitions(3).replicas(1).build();
   }
 
   @Bean
   public CommonErrorHandler kafkaErrorHandler(KafkaOperations<Object, Object> kafkaTemplate) {
     DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
-    // Retry up to 3 times with 1-second intervals before sending to DLQ
+    // Retry up to 3 times with 1-second intervals before sending to the DLT
     DefaultErrorHandler errorHandler =
         new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
     errorHandler.setRetryListeners(

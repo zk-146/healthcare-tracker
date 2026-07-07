@@ -3,6 +3,8 @@ package com.healthcare.activitytracker.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.healthcare.activitytracker.exception.ResourceConflictException;
@@ -174,6 +176,7 @@ class AuthServiceTest {
         RefreshToken.builder().tokenHash(tokenHash).user(user).revoked(false).build();
 
     when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(storedToken));
+    when(refreshTokenRepository.revokeByTokenHash(tokenHash)).thenReturn(1);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(refreshTokenRepository.save(any(RefreshToken.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -214,5 +217,77 @@ class AuthServiceTest {
     assertThatThrownBy(() -> authService.refresh(refreshToken))
         .isInstanceOf(UnauthorizedException.class)
         .hasMessageContaining("revoked");
+
+    // Reuse of a rotated token is treated as theft: the whole family must be revoked
+    verify(refreshTokenRepository).revokeAllByUserId(userId);
+  }
+
+  @Test
+  void refresh_whenConcurrentRotationLosesRace_revokesFamilyAndThrows() {
+    UUID userId = UUID.randomUUID();
+    String refreshToken = jwtUtil.generateRefreshToken(userId, "user@example.com");
+    String tokenHash = AuthService.sha256(refreshToken);
+
+    User user =
+        User.builder()
+            .id(userId)
+            .email("user@example.com")
+            .passwordHash("hash")
+            .fullName("Test User")
+            .build();
+
+    RefreshToken storedToken =
+        RefreshToken.builder().tokenHash(tokenHash).user(user).revoked(false).build();
+
+    when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(storedToken));
+    // Another request revoked the token between the read and the atomic claim
+    when(refreshTokenRepository.revokeByTokenHash(tokenHash)).thenReturn(0);
+
+    assertThatThrownBy(() -> authService.refresh(refreshToken))
+        .isInstanceOf(UnauthorizedException.class)
+        .hasMessageContaining("revoked");
+
+    verify(refreshTokenRepository).revokeAllByUserId(userId);
+  }
+
+  @Test
+  void changePassword_updatesHashAndRevokesAllTokens() {
+    UUID userId = UUID.randomUUID();
+    User user =
+        User.builder()
+            .id(userId)
+            .email("user@example.com")
+            .passwordHash(passwordEncoder.encode("OldP@ssword123"))
+            .fullName("Test User")
+            .build();
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    authService.changePassword(userId, "OldP@ssword123", "NewP@ssword456");
+
+    assertThat(passwordEncoder.matches("NewP@ssword456", user.getPasswordHash())).isTrue();
+    verify(refreshTokenRepository).revokeAllByUserId(userId);
+  }
+
+  @Test
+  void changePassword_throwsUnauthorized_whenCurrentPasswordWrong() {
+    UUID userId = UUID.randomUUID();
+    User user =
+        User.builder()
+            .id(userId)
+            .email("user@example.com")
+            .passwordHash(passwordEncoder.encode("OldP@ssword123"))
+            .fullName("Test User")
+            .build();
+
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThatThrownBy(() -> authService.changePassword(userId, "WrongP@ss999", "NewP@ssword456"))
+        .isInstanceOf(UnauthorizedException.class)
+        .hasMessageContaining("Current password");
+
+    verify(userRepository, never()).save(any(User.class));
+    verify(refreshTokenRepository, never()).revokeAllByUserId(any());
   }
 }

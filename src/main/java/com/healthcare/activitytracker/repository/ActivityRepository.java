@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,27 +24,15 @@ import org.springframework.stereotype.Repository;
 public interface ActivityRepository
     extends JpaRepository<Activity, UUID>, JpaSpecificationExecutor<Activity> {
 
-  Page<Activity> findByUserIdOrderByStartedAtDesc(UUID userId, Pageable pageable);
-
-  Page<Activity> findByUserIdAndActivityTypeOrderByStartedAtDesc(
-      UUID userId, ActivityType activityType, Pageable pageable);
-
-  Page<Activity> findByUserIdAndSourceOrderByStartedAtDesc(
-      UUID userId, ActivitySource source, Pageable pageable);
-
   Optional<Activity> findByIdAndUserId(UUID id, UUID userId);
 
   /** True if a workout from the given external source record has already been imported. */
   boolean existsByUserIdAndExternalId(UUID userId, String externalId);
 
-  @Query(
-      "SELECT a FROM Activity a WHERE a.user.id = :userId "
-          + "AND a.startedAt >= :from AND a.startedAt <= :to "
-          + "ORDER BY a.startedAt DESC")
-  List<Activity> findByUserIdAndDateRange(
-      @Param("userId") UUID userId,
-      @Param("from") LocalDateTime from,
-      @Param("to") LocalDateTime to);
+  /** Delete all activities for a user (account deletion). */
+  @Modifying
+  @Query("DELETE FROM Activity a WHERE a.user.id = :userId")
+  int deleteAllByUserId(@Param("userId") UUID userId);
 
   @Query(
       "SELECT a FROM Activity a WHERE a.user.id = :userId "
