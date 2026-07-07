@@ -43,13 +43,24 @@ public class JwtSecretValidator implements ApplicationRunner {
       String message =
           "JWT secrets are set to insecure default values. "
               + "Set JWT_SECRET and JWT_REFRESH_SECRET environment variables.";
-      if (isProduction) {
-        throw new IllegalStateException(
-            "FATAL: "
-                + message
-                + " Application cannot start in 'prod' profile with default secrets.");
-      }
-      log.warn("WARNING: {} This is acceptable for local development only.", message);
+      failOrWarn(isProduction, message);
     }
+
+    // Identical secrets collapse the access/refresh key separation: a refresh token would
+    // carry a valid signature under the access key (only the type claim would stop it).
+    if (jwtSecret.equals(jwtRefreshSecret)) {
+      failOrWarn(
+          isProduction,
+          "JWT_SECRET and JWT_REFRESH_SECRET are identical. Access and refresh tokens must be "
+              + "signed with different keys.");
+    }
+  }
+
+  private void failOrWarn(boolean isProduction, String message) {
+    if (isProduction) {
+      throw new IllegalStateException(
+          "FATAL: " + message + " Application cannot start in 'prod' profile.");
+    }
+    log.warn("WARNING: {} This is acceptable for local development only.", message);
   }
 }

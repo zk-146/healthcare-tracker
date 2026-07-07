@@ -5,15 +5,22 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.annotation.Order;
+import org.slf4j.MDC;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * Logs one summary line per request and owns the MDC lifecycle: it assigns the {@code requestId} on
+ * entry and clears the MDC on exit. It is registered ahead of the Spring Security chain (see {@code
+ * FilterConfig}), so security rejections are logged too and MDC entries contributed by inner
+ * filters (e.g. {@code userId} from {@code JwtAuthenticationFilter}) are still present when the
+ * summary line is written.
+ */
 @Component
-@Order(1)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
@@ -29,6 +36,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
 
     long start = System.currentTimeMillis();
+    MDC.put("requestId", UUID.randomUUID().toString().substring(0, 8));
 
     try {
       filterChain.doFilter(request, response);
@@ -40,6 +48,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
           request.getRequestURI(),
           response.getStatus(),
           duration);
+      MDC.clear();
     }
   }
 }

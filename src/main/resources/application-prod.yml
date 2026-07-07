@@ -21,6 +21,13 @@ logging:
     com.healthcare.activitytracker: INFO
     org.springframework.security: WARN
 
+# API documentation is not served in production; the swagger/api-docs paths return 404.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 app:
   jwt:
     secret: ${JWT_SECRET}
