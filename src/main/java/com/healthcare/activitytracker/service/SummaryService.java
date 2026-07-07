@@ -171,6 +171,10 @@ public class SummaryService {
    * Calculates the current activity streak in the user's local timezone. Without a zone,
    * server-midnight boundaries would be used, breaking streaks for users in timezones that differ
    * significantly from the server's.
+   *
+   * <p>Cost note: fetches up to ~400 distinct active dates per call, and the Kafka consumer invokes
+   * this for every activity created. If event volume grows, consider caching the streak per user or
+   * replacing this with a windowed SQL computation.
    */
   @Transactional(readOnly = true)
   public int getCurrentStreak(UUID userId, ZoneId zone) {

@@ -1,9 +1,11 @@
 package com.healthcare.activitytracker.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.SecurityConfig;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
+import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.ProfileService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
@@ -39,12 +42,17 @@ class ProfileControllerTest {
   @Autowired MockMvc mockMvc;
   @Autowired ObjectMapper objectMapper;
   @MockBean ProfileService profileService;
+  @MockBean AuthService authService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
   private static RequestPostProcessor uuidUser() {
+    return uuidUser(UUID.randomUUID());
+  }
+
+  private static RequestPostProcessor uuidUser(UUID userId) {
     Authentication auth =
-        new UsernamePasswordAuthenticationToken(UUID.randomUUID(), null, Collections.emptyList());
+        new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
     return authentication(auth);
   }
 
@@ -114,5 +122,30 @@ class ProfileControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void deleteAccount_returns204_andRevokesTokenAndDeletesData() throws Exception {
+    UUID userId = UUID.randomUUID();
+    // The real JwtAuthenticationFilter is part of the slice and sees the Bearer header,
+    // so the mocked JwtUtil must accept the token
+    when(jwtUtil.isAccessTokenValid("some-access-token")).thenReturn(true);
+    when(jwtUtil.getTokenType("some-access-token")).thenReturn("access");
+    when(jwtUtil.getUserIdFromToken("some-access-token")).thenReturn(userId);
+
+    mockMvc
+        .perform(
+            delete("/api/v1/profile")
+                .with(uuidUser(userId))
+                .header("Authorization", "Bearer some-access-token"))
+        .andExpect(status().isNoContent());
+
+    verify(authService).logout("some-access-token");
+    verify(profileService).deleteAccount(userId);
+  }
+
+  @Test
+  void deleteAccount_returns401_whenUnauthenticated() throws Exception {
+    mockMvc.perform(delete("/api/v1/profile")).andExpect(status().isUnauthorized());
   }
 }
