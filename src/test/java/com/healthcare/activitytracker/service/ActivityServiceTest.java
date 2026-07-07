@@ -34,6 +34,8 @@ class ActivityServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private ActivityEventPublisher activityEventPublisher;
 
+  private final ActivityTypeMapper activityTypeMapper = new ActivityTypeMapper();
+
   private ActivityService activityService;
 
   private final UUID userId = UUID.randomUUID();
@@ -42,7 +44,8 @@ class ActivityServiceTest {
   @BeforeEach
   void setUp() throws Exception {
     activityService =
-        new ActivityService(activityRepository, userRepository, activityEventPublisher);
+        new ActivityService(
+            activityRepository, userRepository, activityEventPublisher, activityTypeMapper);
     // Inject maxPageSize (normally set by @Value) so PageRequest.of() doesn't get size 0
     java.lang.reflect.Field f = ActivityService.class.getDeclaredField("maxPageSize");
     f.setAccessible(true);
@@ -140,5 +143,52 @@ class ActivityServiceTest {
     Page<ActivityResponse> result =
         activityService.getActivities(userId, null, null, null, null, pageable);
     assertThat(result.getTotalElements()).isEqualTo(1);
+  }
+
+  @Test
+  void importWorkout_savesNewWorkoutAsIotActivityAndPublishesEvent() {
+    when(activityRepository.existsByUserIdAndExternalId(userId, "rec-1")).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
+    when(activityRepository.saveAndFlush(any(Activity.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    com.healthcare.activitytracker.model.integration.ImportedWorkout workout =
+        com.healthcare.activitytracker.model.integration.ImportedWorkout.builder()
+            .externalId("rec-1")
+            .rawType("RUN")
+            .startedAt(LocalDateTime.now().minusHours(1))
+            .distanceKm(5.0)
+            .build();
+
+    boolean imported = activityService.importWorkout(userId, workout, "fitbit-charge-6");
+
+    assertThat(imported).isTrue();
+    org.mockito.ArgumentCaptor<Activity> captor =
+        org.mockito.ArgumentCaptor.forClass(Activity.class);
+    verify(activityRepository).saveAndFlush(captor.capture());
+    Activity saved = captor.getValue();
+    assertThat(saved.getSource()).isEqualTo(ActivitySource.IOT);
+    assertThat(saved.getActivityType()).isEqualTo(ActivityType.RUNNING);
+    assertThat(saved.getDeviceId()).isEqualTo("fitbit-charge-6");
+    assertThat(saved.getExternalId()).isEqualTo("rec-1");
+    verify(activityEventPublisher).publishActivityCreated(any());
+  }
+
+  @Test
+  void importWorkout_skipsDuplicateAndDoesNotPublish() {
+    when(activityRepository.existsByUserIdAndExternalId(userId, "rec-dup")).thenReturn(true);
+
+    com.healthcare.activitytracker.model.integration.ImportedWorkout workout =
+        com.healthcare.activitytracker.model.integration.ImportedWorkout.builder()
+            .externalId("rec-dup")
+            .rawType("WALK")
+            .startedAt(LocalDateTime.now())
+            .build();
+
+    boolean imported = activityService.importWorkout(userId, workout, "fitbit-charge-6");
+
+    assertThat(imported).isFalse();
+    verify(activityRepository, never()).saveAndFlush(any());
+    verify(activityEventPublisher, never()).publishActivityCreated(any());
   }
 }

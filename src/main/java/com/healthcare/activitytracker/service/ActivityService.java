@@ -8,6 +8,7 @@ import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.model.enums.ActivitySource;
 import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
+import com.healthcare.activitytracker.model.integration.ImportedWorkout;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDate;
@@ -36,14 +37,73 @@ public class ActivityService {
   private final ActivityRepository activityRepository;
   private final UserRepository userRepository;
   private final ActivityEventPublisher activityEventPublisher;
+  private final ActivityTypeMapper activityTypeMapper;
 
   public ActivityService(
       ActivityRepository activityRepository,
       UserRepository userRepository,
-      ActivityEventPublisher activityEventPublisher) {
+      ActivityEventPublisher activityEventPublisher,
+      ActivityTypeMapper activityTypeMapper) {
     this.activityRepository = activityRepository;
     this.userRepository = userRepository;
     this.activityEventPublisher = activityEventPublisher;
+    this.activityTypeMapper = activityTypeMapper;
+  }
+
+  /**
+   * Persists a workout imported from an external source (e.g. Google Health / Fitbit) and publishes
+   * the same {@code ACTIVITY_CREATED} event manual entries produce, so streak-milestone detection
+   * runs for imported activities too.
+   *
+   * <p>Idempotent: if a workout with the same {@code externalId} already exists for the user,
+   * nothing is written and {@code false} is returned. This lets the scheduled sync re-poll
+   * overlapping windows safely.
+   *
+   * @param userId the owner importing the workout
+   * @param workout the provider-neutral workout to import
+   * @param deviceLabel value stored in {@code device_id} (e.g. "fitbit-charge-6")
+   * @return {@code true} if a new activity was created, {@code false} if it was a duplicate
+   * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
+   *     exist
+   */
+  @Transactional
+  public boolean importWorkout(UUID userId, ImportedWorkout workout, String deviceLabel) {
+    if (workout.getExternalId() != null
+        && activityRepository.existsByUserIdAndExternalId(userId, workout.getExternalId())) {
+      log.debug("Skipping already-imported workout externalId={}", workout.getExternalId());
+      return false;
+    }
+
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    Activity activity =
+        Activity.builder()
+            .user(user)
+            .activityType(activityTypeMapper.map(workout.getRawType()))
+            .source(ActivitySource.IOT)
+            .deviceId(deviceLabel)
+            .externalId(workout.getExternalId())
+            .startedAt(workout.getStartedAt())
+            .endedAt(workout.getEndedAt())
+            .durationMinutes(workout.getDurationMinutes())
+            .distanceKm(workout.getDistanceKm())
+            .caloriesBurned(workout.getCaloriesBurned())
+            .heartRateAvg(workout.getHeartRateAvg())
+            .steps(workout.getSteps())
+            .build();
+
+    activity = activityRepository.saveAndFlush(activity);
+    log.info(
+        "Imported activity {} [type={}, externalId={}]",
+        activity.getId(),
+        activity.getActivityType(),
+        activity.getExternalId());
+
+    activityEventPublisher.publishActivityCreated(toEvent(activity));
+    return true;
   }
 
   /**

@@ -50,6 +50,13 @@ public class Activity {
   @Column(name = "device_id", length = 100)
   private String deviceId;
 
+  /**
+   * Identifier of the originating record in an external system (e.g. a Google Health workout
+   * session). Null for activities entered manually. Used to de-duplicate repeated imports.
+   */
+  @Column(name = "external_id", length = 255)
+  private String externalId;
+
   @Column(name = "started_at", nullable = false)
   private LocalDateTime startedAt;
 
