@@ -26,6 +26,9 @@ public interface ActivityRepository
 
   Optional<Activity> findByIdAndUserId(UUID id, UUID userId);
 
+  /** True if a workout from the given external source record has already been imported. */
+  boolean existsByUserIdAndExternalId(UUID userId, String externalId);
+
   /** Delete all activities for a user (account deletion). */
   @Modifying
   @Query("DELETE FROM Activity a WHERE a.user.id = :userId")

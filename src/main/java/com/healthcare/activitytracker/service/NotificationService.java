@@ -20,4 +20,14 @@ public class NotificationService {
         streakDays,
         triggeringActivityId);
   }
+
+  /**
+   * Prompts the owner to re-authorize an external integration. Sent when a refresh token is
+   * revoked/expired (in Google OAuth "Testing" mode this happens roughly every 7 days).
+   */
+  public void sendReconnectReminder(User user, String integration) {
+    // Email deliberately not logged, matching the HIPAA/PII policy above.
+    log.info(
+        "NOTIFICATION userId={} type=RECONNECT_REQUIRED integration={}", user.getId(), integration);
+  }
 }

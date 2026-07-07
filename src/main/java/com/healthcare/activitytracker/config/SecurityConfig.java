@@ -61,6 +61,10 @@ public class SecurityConfig {
                         "/api/v1/auth/refresh",
                         "/api/v1/auth/logout")
                     .permitAll()
+                    // OAuth redirect target: Google sends the browser here with no JWT, so it
+                    // cannot require authentication. It is secured instead by the one-time state.
+                    .requestMatchers("/api/v1/integrations/google-health/callback")
+                    .permitAll()
                     // API docs are public; springdoc is disabled in the prod profile,
                     // where these paths return 404
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")

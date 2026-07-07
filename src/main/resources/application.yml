@@ -109,3 +109,17 @@ app:
       activity-events: activity-events
     consumer:
       group-id: activity-tracker-consumers
+  integrations:
+    google-health:
+      # Master switch. Leave false until a Google Cloud OAuth client is configured.
+      enabled: ${GOOGLE_HEALTH_ENABLED:false}
+      client-id: ${GOOGLE_HEALTH_CLIENT_ID:}
+      client-secret: ${GOOGLE_HEALTH_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_HEALTH_REDIRECT_URI:http://localhost:8080/api/v1/integrations/google-health/callback}
+      # Passphrase used to encrypt stored OAuth tokens at rest. Override in any real deployment.
+      token-encryption-key: ${GOOGLE_HEALTH_TOKEN_KEY:change-me-token-encryption-key}
+      device-label: fitbit-charge-6
+      # How often the background sync polls Google Health (ms). Default: 1 hour.
+      poll-interval-ms: ${GOOGLE_HEALTH_POLL_INTERVAL_MS:3600000}
+      initial-delay-ms: 60000
+      initial-backfill-days: 30
