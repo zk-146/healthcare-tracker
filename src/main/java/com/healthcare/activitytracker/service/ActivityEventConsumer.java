@@ -22,6 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Detects streak milestones asynchronously — the POST /api/v1/activities request returns
  * immediately and this runs on the Kafka consumer thread.
+ *
+ * <p><strong>Timezone note:</strong> milestone streaks are computed with UTC day boundaries. The
+ * event does not carry the user's timezone (the X-User-Timezone header only exists on summary
+ * reads), so a user far from UTC may see a summary streak that differs by one from the milestone
+ * engine around midnight. If exact agreement is required, persist a timezone on the user profile
+ * and propagate it through {@link ActivityCreatedEvent}.
  */
 @Service
 public class ActivityEventConsumer {
@@ -84,7 +90,7 @@ public class ActivityEventConsumer {
         StreakMilestone.builder()
             .user(user)
             .milestoneDays(streak)
-            .achievedAt(LocalDateTime.now())
+            .achievedAt(LocalDateTime.now(ZoneOffset.UTC))
             .triggeringActivityId(event.getActivityId())
             .build();
 

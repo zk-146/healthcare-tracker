@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
@@ -102,11 +104,16 @@ class ActivityRepositoryTest {
   }
 
   @Test
-  void testFindByUserIdAndDateRange() {
-    List<Activity> list =
-        activityRepository.findByUserIdAndDateRange(
-            testUser.getId(), LocalDateTime.now().minusDays(5), LocalDateTime.now().plusDays(1));
+  void testFindByFiltersWithDateRange() {
+    Page<Activity> page =
+        activityRepository.findByFilters(
+            testUser.getId(),
+            LocalDateTime.now().minusDays(5),
+            LocalDateTime.now().plusDays(1),
+            null,
+            null,
+            PageRequest.of(0, 10));
 
-    assertThat(list).hasSize(2);
+    assertThat(page.getContent()).hasSize(2);
   }
 }

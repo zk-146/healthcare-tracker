@@ -12,10 +12,11 @@ public class NotificationService {
   private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
   public void sendMilestoneNotification(User user, int streakDays, UUID triggeringActivityId) {
+    // The email address is deliberately NOT logged (HIPAA/PII policy: identifiers only).
+    // A real delivery integration should resolve the address at send time.
     log.info(
-        "NOTIFICATION userId={} email={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={}",
+        "NOTIFICATION userId={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={}",
         user.getId(),
-        user.getEmail(),
         streakDays,
         triggeringActivityId);
   }
@@ -25,10 +26,8 @@ public class NotificationService {
    * revoked/expired (in Google OAuth "Testing" mode this happens roughly every 7 days).
    */
   public void sendReconnectReminder(User user, String integration) {
+    // Email deliberately not logged, matching the HIPAA/PII policy above.
     log.info(
-        "NOTIFICATION userId={} email={} type=RECONNECT_REQUIRED integration={}",
-        user.getId(),
-        user.getEmail(),
-        integration);
+        "NOTIFICATION userId={} type=RECONNECT_REQUIRED integration={}", user.getId(), integration);
   }
 }

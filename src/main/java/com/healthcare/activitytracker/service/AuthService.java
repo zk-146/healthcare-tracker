@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -65,6 +66,9 @@ public class AuthService {
     // Normalize email to prevent duplicate accounts differing only by case/whitespace
     String normalizedEmail = request.getEmail().strip().toLowerCase(Locale.ROOT);
 
+    // Accepted tradeoff: the 409 reveals whether an email is registered (enumeration).
+    // Registration is per-IP rate-limited, which bounds abuse; a fully opaque flow requires
+    // an email-verification step ("account created, check your inbox") — see AUDIT.md L4.
     if (userRepository.existsByEmail(normalizedEmail)) {
       throw new ResourceConflictException("Email already registered");
     }
@@ -113,6 +117,11 @@ public class AuthService {
    * refresh token is revoked after use (rotation), and a new refresh token is issued alongside the
    * new access token.
    *
+   * <p>Presenting an already-rotated token is treated as evidence of token theft (OWASP
+   * refresh-token rotation guidance): every active refresh token for the user is revoked, forcing
+   * re-authentication on all devices. The rotation itself is an atomic conditional UPDATE, so two
+   * concurrent requests with the same token cannot both succeed.
+   *
    * @param refreshToken the raw refresh token JWT
    * @return new access and refresh tokens
    * @throws com.healthcare.activitytracker.exception.UnauthorizedException if the token is invalid,
@@ -137,7 +146,13 @@ public class AuthService {
             .findByTokenHash(tokenHash)
             .orElseThrow(() -> new UnauthorizedException("Refresh token not found"));
     if (storedToken.isRevoked()) {
-      throw new UnauthorizedException("Refresh token has been revoked");
+      throw suspectedReuse(storedToken);
+    }
+
+    // Atomically claim the token; a concurrent refresh with the same token loses this race
+    // and is treated as reuse.
+    if (refreshTokenRepository.revokeByTokenHash(tokenHash) == 0) {
+      throw suspectedReuse(storedToken);
     }
 
     var userId = jwtUtil.getUserIdFromRefreshToken(refreshToken);
@@ -146,15 +161,21 @@ public class AuthService {
             .findById(userId)
             .orElseThrow(() -> new UnauthorizedException("User not found"));
 
-    // Revoke the used refresh token so it cannot be replayed
-    storedToken.setRevoked(true);
-    refreshTokenRepository.save(storedToken);
-
-    // Also add to the fast-path blacklist (Redis/in-memory) for immediate enforcement
-    long remainingMs = claims.getExpiration().getTime() - new Date().getTime();
-    tokenBlacklistService.revoke(refreshToken, Math.max(remainingMs, 0));
-
     return buildAuthResponse(user);
+  }
+
+  /**
+   * Handles presentation of an already-revoked refresh token: revokes the user's entire token
+   * family (the token may be stolen) and returns the exception for the caller to throw.
+   */
+  private UnauthorizedException suspectedReuse(RefreshToken storedToken) {
+    UUID userId = storedToken.getUser().getId();
+    int revoked = refreshTokenRepository.revokeAllByUserId(userId);
+    log.warn(
+        "Refresh token reuse detected for user {}: revoked {} active refresh token(s)",
+        userId,
+        revoked);
+    return new UnauthorizedException("Refresh token has been revoked");
   }
 
   /**
@@ -183,9 +204,35 @@ public class AuthService {
     }
   }
 
+  /**
+   * Changes the user's password after verifying the current one, then revokes all refresh tokens so
+   * every session must re-authenticate with the new password. Outstanding access tokens remain
+   * valid until they expire (at most 15 minutes).
+   *
+   * @throws com.healthcare.activitytracker.exception.UnauthorizedException if the current password
+   *     does not match
+   */
+  @Transactional
+  public void changePassword(UUID userId, String currentPassword, String newPassword) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+    if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+      log.warn("Failed password change attempt for userId: {}", userId);
+      throw new UnauthorizedException("Current password is incorrect");
+    }
+
+    user.setPasswordHash(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+    revokeAllUserTokens(userId);
+    log.info("Password changed for user {}", userId);
+  }
+
   /** Revoke all refresh tokens for a user (e.g. on password change or security incident). */
   @Transactional
-  public void revokeAllUserTokens(java.util.UUID userId) {
+  public void revokeAllUserTokens(UUID userId) {
     int revoked = refreshTokenRepository.revokeAllByUserId(userId);
     log.info("Revoked {} refresh token(s) for user {}", revoked, userId);
   }
