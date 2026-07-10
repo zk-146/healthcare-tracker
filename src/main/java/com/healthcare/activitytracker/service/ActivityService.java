@@ -68,6 +68,17 @@ public class ActivityService {
    */
   @Transactional
   public boolean importWorkout(UUID userId, ImportedWorkout workout, String deviceLabel) {
+    return importWorkout(userId, workout, deviceLabel, ActivitySource.IOT);
+  }
+
+  /**
+   * Same as {@link #importWorkout(UUID, ImportedWorkout, String)} but lets the caller specify the
+   * {@link ActivitySource} to tag the resulting activity with (e.g. {@code CSV_IMPORT} for
+   * bulk-loaded exports rather than {@code IOT} for live device syncs).
+   */
+  @Transactional
+  public boolean importWorkout(
+      UUID userId, ImportedWorkout workout, String deviceLabel, ActivitySource source) {
     if (workout.getExternalId() != null
         && activityRepository.existsByUserIdAndExternalId(userId, workout.getExternalId())) {
       log.debug("Skipping already-imported workout externalId={}", workout.getExternalId());
@@ -83,7 +94,7 @@ public class ActivityService {
         Activity.builder()
             .user(user)
             .activityType(activityTypeMapper.map(workout.getRawType()))
-            .source(ActivitySource.IOT)
+            .source(source)
             .deviceId(deviceLabel)
             .externalId(workout.getExternalId())
             .startedAt(workout.getStartedAt())
