@@ -13,6 +13,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-for-local-testing-must-be-at-least-32-chars}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-for-local-testing-at-least-32-chars}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
     depends_on:
       postgres:
         condition: service_healthy
@@ -20,6 +22,8 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
+      ollama:
+        condition: service_started
 
   postgres:
     image: postgres:16-alpine
@@ -80,5 +84,43 @@ services:
       kafka:
         condition: service_healthy
 
+  ollama:
+    image: ollama/ollama:latest
+    # Host port 11435: a native Windows Ollama install owns 11434 on this machine.
+    # Inside the compose network the app reaches this instance at http://ollama:11434.
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  # One-shot model pull into the shared volume; exits when done. Idempotent —
+  # re-running against an already-pulled model is a fast no-op.
+  # NOTE: qwen2.5:14b is ~9 GB and exceeds the 8 GB VRAM of this machine's RTX 4060,
+  # so Ollama will split it across GPU+CPU (works, but slow). Set OLLAMA_MODEL=qwen2.5:7b
+  # for a model that fits entirely in VRAM.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama"]
+    command: ["pull", "${OLLAMA_MODEL:-qwen2.5:14b}"]
+
 volumes:
   postgres-data:
+  ollama-models:
