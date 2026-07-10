@@ -124,6 +124,13 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- CSV import (bulk-loading external exports, e.g. Kaggle Fitbit datasets) -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

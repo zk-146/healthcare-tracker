@@ -2,5 +2,6 @@ package com.healthcare.activitytracker.model.enums;
 
 public enum ActivitySource {
   MANUAL,
-  IOT
+  IOT,
+  CSV_IMPORT
 }
