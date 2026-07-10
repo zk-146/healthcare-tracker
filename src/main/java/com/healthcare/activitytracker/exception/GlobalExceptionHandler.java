@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -57,6 +58,20 @@ public class GlobalExceptionHandler {
     body.put("timestamp", Instant.now().toString());
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+  }
+
+  @ExceptionHandler(CsvImportException.class)
+  public ResponseEntity<Map<String, Object>> handleCsvImport(CsvImportException ex) {
+    log.warn("CSV import rejected: {}", ex.getMessage());
+    return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<Map<String, Object>> handleMaxUploadSize(
+      MaxUploadSizeExceededException ex) {
+    log.warn("Uploaded file exceeds the configured size limit");
+    return buildResponse(
+        HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file exceeds the maximum allowed size");
   }
 
   @ExceptionHandler(MissingServletRequestParameterException.class)

@@ -57,15 +57,16 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 1MB
-      max-request-size: 1MB
+      # Large enough for a Kaggle Fitbit dailyActivity_merged.csv export (single-digit MB).
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 server:
   port: 8080
   # Limit maximum request body size at the Tomcat level
   tomcat:
-    max-http-form-post-size: 1MB
-    max-swallow-size: 1MB
+    max-http-form-post-size: 20MB
+    max-swallow-size: 20MB
 
 # Only expose the health endpoint; all others are disabled by default
 management:
