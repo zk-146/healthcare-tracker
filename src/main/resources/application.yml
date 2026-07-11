@@ -105,6 +105,12 @@ app:
     trusted-proxies: ${TRUSTED_PROXIES:}
   summary:
     max-range-days: 365
+  ollama:
+    enabled: ${OLLAMA_ENABLED:true}
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:qwen2.5:14b}
+    connect-timeout-ms: 3000
+    read-timeout-ms: ${OLLAMA_READ_TIMEOUT_MS:120000}
   kafka:
     topics:
       activity-events: activity-events
