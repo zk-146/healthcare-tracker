@@ -1,6 +1,8 @@
 package com.healthcare.activitytracker.controller;
 
+import com.healthcare.activitytracker.model.dto.DigestResponse;
 import com.healthcare.activitytracker.model.dto.SummaryResponse;
+import com.healthcare.activitytracker.service.ActivityDigestService;
 import com.healthcare.activitytracker.service.SummaryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,9 +25,12 @@ public class SummaryController {
   private static final Logger log = LoggerFactory.getLogger(SummaryController.class);
 
   private final SummaryService summaryService;
+  private final ActivityDigestService activityDigestService;
 
-  public SummaryController(SummaryService summaryService) {
+  public SummaryController(
+      SummaryService summaryService, ActivityDigestService activityDigestService) {
     this.summaryService = summaryService;
+    this.activityDigestService = activityDigestService;
   }
 
   /**
@@ -75,6 +80,22 @@ public class SummaryController {
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
     return ResponseEntity.ok(summaryService.getMonthlySummary(userId, resolveZone(timezone)));
+  }
+
+  /**
+   * Returns an AI-generated natural-language digest of the user's recent activity. When the local
+   * LLM is unavailable the response has {@code available=false} and a fallback message — never an
+   * error.
+   */
+  @Operation(summary = "Get an AI-generated activity digest (daily, weekly, or monthly)")
+  @GetMapping("/digest")
+  public ResponseEntity<DigestResponse> getDigest(
+      Authentication auth,
+      @RequestParam(defaultValue = "weekly") String period,
+      @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
+    UUID userId = (UUID) auth.getPrincipal();
+    return ResponseEntity.ok(
+        activityDigestService.generateDigest(userId, period, resolveZone(timezone)));
   }
 
   /**
