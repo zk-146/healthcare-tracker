@@ -81,8 +81,8 @@ public class ActivityController {
   }
 
   /**
-   * Returns an AI analysis of this activity's notes (mood and pain mentions). When the local LLM
-   * is unavailable, responds with {@code available=false} instead of an error. 404 if the activity
+   * Returns an AI analysis of this activity's notes (mood and pain mentions). When the local LLM is
+   * unavailable, responds with {@code available=false} instead of an error. 404 if the activity
    * does not exist or belongs to another user.
    */
   @Operation(summary = "AI analysis of this activity's notes (mood / pain mentions)")
