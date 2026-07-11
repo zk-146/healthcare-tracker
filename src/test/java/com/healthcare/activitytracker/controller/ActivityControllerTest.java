@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.SecurityConfig;
+import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ActivityRequest;
 import com.healthcare.activitytracker.model.dto.ActivityResponse;
+import com.healthcare.activitytracker.model.dto.NotesInsightResponse;
 import com.healthcare.activitytracker.model.enums.ActivitySource;
 import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.service.ActivityService;
+import com.healthcare.activitytracker.service.NotesAnalysisService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.time.LocalDateTime;
@@ -41,6 +44,7 @@ class ActivityControllerTest {
   @Autowired MockMvc mockMvc;
   @Autowired ObjectMapper objectMapper;
   @MockBean ActivityService activityService;
+  @MockBean NotesAnalysisService notesAnalysisService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
@@ -153,5 +157,42 @@ class ActivityControllerTest {
                 .param("from", "2024-01-01")
                 .param("to", "2024-12-31"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void getInsights_returns200_withAnalysis() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(notesAnalysisService.analyzeNotes(any(), any()))
+        .thenReturn(
+            NotesInsightResponse.builder()
+                .activityId(id)
+                .available(true)
+                .mood("positive")
+                .painMentioned(false)
+                .build());
+
+    mockMvc
+        .perform(get("/api/v1/activities/" + id + "/insights").with(uuidUser()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true))
+        .andExpect(jsonPath("$.mood").value("positive"))
+        .andExpect(jsonPath("$.painMentioned").value(false));
+  }
+
+  @Test
+  void getInsights_returns404_whenActivityMissing() throws Exception {
+    when(notesAnalysisService.analyzeNotes(any(), any()))
+        .thenThrow(new ResourceNotFoundException("Activity not found"));
+
+    mockMvc
+        .perform(get("/api/v1/activities/" + UUID.randomUUID() + "/insights").with(uuidUser()))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void getInsights_returns401_whenUnauthenticated() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/activities/" + UUID.randomUUID() + "/insights"))
+        .andExpect(status().isUnauthorized());
   }
 }
