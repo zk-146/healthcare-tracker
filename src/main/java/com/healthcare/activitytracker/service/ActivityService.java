@@ -38,16 +38,30 @@ public class ActivityService {
   private final UserRepository userRepository;
   private final ActivityEventPublisher activityEventPublisher;
   private final ActivityTypeMapper activityTypeMapper;
+  private final CalorieEstimator calorieEstimator;
 
   public ActivityService(
       ActivityRepository activityRepository,
       UserRepository userRepository,
       ActivityEventPublisher activityEventPublisher,
-      ActivityTypeMapper activityTypeMapper) {
+      ActivityTypeMapper activityTypeMapper,
+      CalorieEstimator calorieEstimator) {
     this.activityRepository = activityRepository;
     this.userRepository = userRepository;
     this.activityEventPublisher = activityEventPublisher;
     this.activityTypeMapper = activityTypeMapper;
+    this.calorieEstimator = calorieEstimator;
+  }
+
+  /** Uses the client-supplied calories when present, otherwise a server-side MET estimate. */
+  private Double resolveCalories(ActivityRequest request, User user) {
+    if (request.getCaloriesBurned() != null) {
+      return request.getCaloriesBurned();
+    }
+    return calorieEstimator
+        .estimateCalories(
+            request.getActivityType(), request.getDurationMinutes(), request.getDistanceKm(), user)
+        .orElse(null);
   }
 
   /**
@@ -144,7 +158,7 @@ public class ActivityService {
             .endedAt(request.getEndedAt())
             .durationMinutes(request.getDurationMinutes())
             .distanceKm(request.getDistanceKm())
-            .caloriesBurned(request.getCaloriesBurned())
+            .caloriesBurned(resolveCalories(request, user))
             .heartRateAvg(request.getHeartRateAvg())
             .steps(request.getSteps())
             .notes(request.getNotes())
@@ -260,7 +274,7 @@ public class ActivityService {
     activity.setEndedAt(request.getEndedAt());
     activity.setDurationMinutes(request.getDurationMinutes());
     activity.setDistanceKm(request.getDistanceKm());
-    activity.setCaloriesBurned(request.getCaloriesBurned());
+    activity.setCaloriesBurned(resolveCalories(request, activity.getUser()));
     activity.setHeartRateAvg(request.getHeartRateAvg());
     activity.setSteps(request.getSteps());
     activity.setNotes(request.getNotes());
