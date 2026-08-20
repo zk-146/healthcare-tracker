@@ -2,6 +2,8 @@ package com.healthcare.activitytracker.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,5 +111,35 @@ class JwtUtilTest {
   @Test
   void getAccessTokenExpiryMs_returnsConfiguredValue() {
     assertThat(jwtUtil.getAccessTokenExpiryMs()).isEqualTo(accessExpiry);
+  }
+
+  /**
+   * Regression: {@code iat}/{@code exp} are second-precision, so without a unique {@code jti} two
+   * tokens minted for the same user inside one second were byte-identical. Their SHA-256 hashes
+   * then collided on the {@code refresh_tokens.token_hash} unique constraint and login failed with
+   * a 409. This loop runs well inside a single second.
+   */
+  @Test
+  void generateRefreshToken_isUniqueAcrossRapidSuccessiveCalls() {
+    UUID userId = UUID.randomUUID();
+
+    Set<String> tokens = new HashSet<>();
+    for (int i = 0; i < 50; i++) {
+      tokens.add(jwtUtil.generateRefreshToken(userId, "test@example.com"));
+    }
+
+    assertThat(tokens).hasSize(50);
+  }
+
+  @Test
+  void generateAccessToken_isUniqueAcrossRapidSuccessiveCalls() {
+    UUID userId = UUID.randomUUID();
+
+    Set<String> tokens = new HashSet<>();
+    for (int i = 0; i < 50; i++) {
+      tokens.add(jwtUtil.generateAccessToken(userId, "test@example.com"));
+    }
+
+    assertThat(tokens).hasSize(50);
   }
 }

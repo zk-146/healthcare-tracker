@@ -159,6 +159,32 @@ class ActivityControllerTest {
         .andExpect(status().isOk());
   }
 
+  /**
+   * Regression: an unconvertible request param used to fall through to the catch-all handler and
+   * surface as a 500. A malformed date, an unknown enum constant, or a bad UUID are all client
+   * errors and must be 400.
+   */
+  @Test
+  void listActivities_withMalformedDate_returns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/activities").with(uuidUser()).param("from", "2024-01-01T00:00:00"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void listActivities_withUnknownActivityType_returns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/activities").with(uuidUser()).param("activityType", "NOPE"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void getActivity_withMalformedUuid_returns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/activities/not-a-uuid").with(uuidUser()))
+        .andExpect(status().isBadRequest());
+  }
+
   @Test
   void getInsights_returns200_withAnalysis() throws Exception {
     UUID id = UUID.randomUUID();
