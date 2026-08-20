@@ -3,7 +3,14 @@ spring:
     name: activity-tracker
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/activity_tracker}
+    # preferQueryMode=simple: ActivityRepository.findByFilters binds null enum/timestamp
+    # parameters (the `:param IS NULL OR ...` idiom). Postgres cannot infer a type for a
+    # null parameter in a server-side prepared statement and fails with
+    # "could not determine data type of parameter $N". Simple query mode sends literals
+    # instead, which sidesteps it at the cost of prepared-statement plan caching.
+    # Removing this requires typing those nulls (explicit casts, or a Criteria query that
+    # omits absent predicates) — do not drop it without doing that first.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/activity_tracker?preferQueryMode=simple}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
