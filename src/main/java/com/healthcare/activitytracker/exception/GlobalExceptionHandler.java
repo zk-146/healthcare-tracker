@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
@@ -109,6 +110,24 @@ public class GlobalExceptionHandler {
       HttpMessageNotReadableException ex) {
     log.warn("Malformed request body: {}", ex.getMessage());
     return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body");
+  }
+
+  /**
+   * An unconvertible {@code @RequestParam}/{@code @PathVariable} (bad date, unknown enum constant,
+   * malformed UUID) is a client error. Without this handler these fall through to {@link
+   * #handleGeneral} and surface as 500s.
+   */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+      MethodArgumentTypeMismatchException ex) {
+    log.warn("Type mismatch for parameter '{}': {}", ex.getName(), ex.getMessage());
+    Class<?> required = ex.getRequiredType();
+    String message =
+        "Parameter '"
+            + ex.getName()
+            + "' has an invalid value"
+            + (required == null ? "" : "; expected type " + required.getSimpleName());
+    return buildResponse(HttpStatus.BAD_REQUEST, message);
   }
 
   @ExceptionHandler(Exception.class)
