@@ -17,8 +17,10 @@ import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.model.enums.OutboxStatus;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.OutboxEventRepository;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -75,8 +77,12 @@ class OutboxRelayTest {
   }
 
   private OutboxEvent pendingRow(String payload, int attempts) {
+    return pendingRow(1L, payload, attempts);
+  }
+
+  private OutboxEvent pendingRow(long id, String payload, int attempts) {
     return OutboxEvent.builder()
-        .id(1L)
+        .id(id)
         .eventId(UUID.randomUUID())
         .aggregateId(UUID.randomUUID())
         .partitionKey(UUID.randomUUID().toString())
@@ -137,6 +143,12 @@ class OutboxRelayTest {
     assertThat(row.getAttempts()).isEqualTo(1);
     assertThat(row.getLastError()).contains("broker down");
     assertThat(row.getSentAt()).isNull();
+    // A retry must wait out a backoff rather than being re-claimed on the very next poll: after
+    // one failed attempt that is 2^1 seconds.
+    assertThat(row.getNextAttemptAt())
+        .isCloseTo(
+            LocalDateTime.now(ZoneOffset.UTC).plusSeconds(OutboxRelay.backoffSeconds(1)),
+            within(5, ChronoUnit.SECONDS));
     verify(outboxRepository).saveAll(List.of(row));
   }
 
@@ -151,6 +163,82 @@ class OutboxRelayTest {
 
     assertThat(row.getAttempts()).isEqualTo(3);
     assertThat(row.getStatus()).isEqualTo(OutboxStatus.FAILED);
+    // No backoff is scheduled for a parked row — claimPending filters on PENDING, so the column
+    // would never be read again.
+    assertThat(row.getNextAttemptAt()).isNull();
+  }
+
+  @Test
+  void backoffDoublesPerAttemptAndIsCapped() {
+    assertThat(OutboxRelay.backoffSeconds(1)).isEqualTo(2);
+    assertThat(OutboxRelay.backoffSeconds(2)).isEqualTo(4);
+    assertThat(OutboxRelay.backoffSeconds(8)).isEqualTo(256);
+    // Capped at five minutes, so a long outage does not push the last attempts hours apart.
+    assertThat(OutboxRelay.backoffSeconds(9)).isEqualTo(300);
+    assertThat(OutboxRelay.backoffSeconds(40)).isEqualTo(300);
+  }
+
+  @Test
+  void awaitBudgetIsSharedAcrossTheBatchInsteadOfRestartingPerRow() {
+    // The regression: passing the full sendTimeoutMs to every Future.get would let a stalled
+    // batch of N rows hold its row locks for N * sendTimeoutMs. One deadline is established
+    // before the first send, and each await gets only what is left of it.
+    long start = 1_000_000_000L;
+    long deadline = start + Duration.ofMillis(1000).toNanos();
+
+    assertThat(OutboxRelay.remainingBudgetMillis(deadline, start)).isEqualTo(1000);
+    assertThat(
+            OutboxRelay.remainingBudgetMillis(deadline, start + Duration.ofMillis(400).toNanos()))
+        .isEqualTo(600);
+    assertThat(
+            OutboxRelay.remainingBudgetMillis(deadline, start + Duration.ofMillis(999).toNanos()))
+        .isEqualTo(1);
+    // Spent budget clamps to an immediate poll rather than going negative.
+    assertThat(OutboxRelay.remainingBudgetMillis(deadline, deadline)).isZero();
+    assertThat(
+            OutboxRelay.remainingBudgetMillis(deadline, start + Duration.ofMillis(1500).toNanos()))
+        .isZero();
+  }
+
+  @Test
+  void handlesAMixedBatchOfSuccessFailureAndPoisonRowsIndependently() {
+    // Every other test claims a single row, where fire-then-await is indistinguishable from
+    // send-and-await-immediately. This one claims three at once.
+    OutboxEvent sent = pendingRow(1L, payloadJson(), 0);
+    OutboxEvent rejected = pendingRow(2L, payloadJson(), 0);
+    OutboxEvent poison = pendingRow(3L, "this is not json", 0);
+    when(outboxRepository.claimPending(anyInt())).thenReturn(List.of(sent, rejected, poison));
+
+    when(kafkaTemplate.send(eq(TOPIC), eq(sent.getPartitionKey()), any(ActivityCreatedEvent.class)))
+        .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+    when(kafkaTemplate.send(
+            eq(TOPIC), eq(rejected.getPartitionKey()), any(ActivityCreatedEvent.class)))
+        .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker down")));
+
+    relay.drain();
+
+    assertThat(sent.getStatus()).isEqualTo(OutboxStatus.SENT);
+    assertThat(sent.getSentAt()).isNotNull();
+    assertThat(sent.getAttempts()).isZero();
+
+    assertThat(rejected.getStatus()).isEqualTo(OutboxStatus.PENDING);
+    assertThat(rejected.getAttempts()).isEqualTo(1);
+    assertThat(rejected.getLastError()).contains("broker down");
+    assertThat(rejected.getSentAt()).isNull();
+
+    assertThat(poison.getStatus()).isEqualTo(OutboxStatus.PENDING);
+    assertThat(poison.getAttempts()).isEqualTo(1);
+    assertThat(poison.getLastError()).isNotBlank();
+    assertThat(poison.getSentAt()).isNull();
+
+    // The poison row is never handed to Kafka: only the two deserializable rows are sent.
+    verify(kafkaTemplate, never())
+        .send(anyString(), eq(poison.getPartitionKey()), any(ActivityCreatedEvent.class));
+    verify(kafkaTemplate, times(2)).send(anyString(), anyString(), any(ActivityCreatedEvent.class));
+    // One flush for the whole batch, not one per row — the point of firing before awaiting.
+    verify(kafkaTemplate, times(1)).flush();
+
+    verify(outboxRepository).saveAll(List.of(sent, rejected, poison));
   }
 
   @Test
