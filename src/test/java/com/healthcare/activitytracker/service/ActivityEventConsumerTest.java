@@ -140,7 +140,8 @@ class ActivityEventConsumerTest {
   @Test
   void awardsEveryCrossedThreshold_whenBackfillJumpsTheStreak() {
     when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(31);
-    when(milestoneRepository.existsByUserIdAndMilestoneDays(eq(userId), anyInt())).thenReturn(false);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(eq(userId), anyInt()))
+        .thenReturn(false);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     consumer.onActivityCreated(event, 0, 0L);
