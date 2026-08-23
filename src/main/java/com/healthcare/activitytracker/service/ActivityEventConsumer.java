@@ -7,7 +7,7 @@ import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Set;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -34,7 +34,8 @@ public class ActivityEventConsumer {
 
   private static final Logger log = LoggerFactory.getLogger(ActivityEventConsumer.class);
 
-  private static final Set<Integer> MILESTONE_THRESHOLDS = Set.of(3, 7, 14, 30, 60, 100, 365);
+  /** Ascending — the order is relied upon when picking the highest threshold crossed. */
+  private static final List<Integer> MILESTONE_THRESHOLDS = List.of(3, 7, 14, 30, 60, 100, 365);
 
   private final SummaryService summaryService;
   private final StreakMilestoneRepository milestoneRepository;
@@ -72,12 +73,21 @@ public class ActivityEventConsumer {
 
     int streak = summaryService.getCurrentStreak(event.getUserId(), ZoneOffset.UTC);
 
-    if (!MILESTONE_THRESHOLDS.contains(streak)) {
-      return;
-    }
+    // Every threshold at or below the current streak has been reached. Matching on
+    // streak *equality* would silently skip thresholds whenever the streak jumps
+    // rather than advancing one day at a time — which is exactly what a bulk CSV
+    // import or the Google Health initial backfill does. A 31-day backfill would
+    // award nothing at all, because 31 is not itself a threshold.
+    List<Integer> newlyReached =
+        MILESTONE_THRESHOLDS.stream()
+            .filter(threshold -> threshold <= streak)
+            .filter(
+                threshold ->
+                    !milestoneRepository.existsByUserIdAndMilestoneDays(
+                        event.getUserId(), threshold))
+            .toList();
 
-    if (milestoneRepository.existsByUserIdAndMilestoneDays(event.getUserId(), streak)) {
-      log.debug("User {} already at milestone {} — skipping", event.getUserId(), streak);
+    if (newlyReached.isEmpty()) {
       return;
     }
 
@@ -86,22 +96,27 @@ public class ActivityEventConsumer {
             .findById(event.getUserId())
             .orElseThrow(() -> new IllegalStateException("User vanished: " + event.getUserId()));
 
-    StreakMilestone milestone =
-        StreakMilestone.builder()
-            .user(user)
-            .milestoneDays(streak)
-            .achievedAt(LocalDateTime.now(ZoneOffset.UTC))
-            .triggeringActivityId(event.getActivityId())
-            .build();
+    LocalDateTime achievedAt = LocalDateTime.now(ZoneOffset.UTC);
+    for (Integer threshold : newlyReached) {
+      milestoneRepository.save(
+          StreakMilestone.builder()
+              .user(user)
+              .milestoneDays(threshold)
+              .achievedAt(achievedAt)
+              .triggeringActivityId(event.getActivityId())
+              .build());
 
-    milestoneRepository.save(milestone);
+      log.info(
+          "MILESTONE REACHED userId={} streakDays={} triggeringActivityId={}",
+          event.getUserId(),
+          threshold,
+          event.getActivityId());
+    }
 
-    log.info(
-        "MILESTONE REACHED userId={} streakDays={} triggeringActivityId={}",
-        event.getUserId(),
-        streak,
-        event.getActivityId());
-
-    notificationService.sendMilestoneNotification(user, streak, event.getActivityId());
+    // Notify once, for the highest threshold crossed. Backfilling past 3/7/14/30
+    // should congratulate the user on 30, not send four notifications. In normal
+    // day-to-day use only one threshold is ever new, so this is unchanged.
+    int highest = newlyReached.get(newlyReached.size() - 1);
+    notificationService.sendMilestoneNotification(user, highest, event.getActivityId());
   }
 }
