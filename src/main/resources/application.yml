@@ -123,6 +123,16 @@ app:
       activity-events: activity-events
     consumer:
       group-id: activity-tracker-consumers
+  outbox:
+    # Master switch for the relay. False leaves events accumulating in the table
+    # unpublished — the same posture OLLAMA_ENABLED=false gives the AI layer.
+    enabled: ${OUTBOX_ENABLED:true}
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: 100
+    max-attempts: 10
+    send-timeout-ms: 10000
+    retention-days: 7
+    purge-interval-ms: 86400000
   integrations:
     google-health:
       # Master switch. Leave false until a Google Cloud OAuth client is configured.
