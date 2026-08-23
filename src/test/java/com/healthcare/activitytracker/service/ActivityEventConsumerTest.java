@@ -3,6 +3,7 @@ package com.healthcare.activitytracker.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.healthcare.activitytracker.model.entity.StreakMilestone;
@@ -102,22 +103,96 @@ class ActivityEventConsumerTest {
   }
 
   @Test
-  void doesNotSave_whenStreakIsNotAMilestone() {
-    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(5);
+  void doesNotSave_whenStreakBelowLowestThreshold() {
+    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(2);
 
     consumer.onActivityCreated(event, 0, 0L);
 
-    verify(milestoneRepository, never()).existsByUserIdAndMilestoneDays(any(), any());
     verify(milestoneRepository, never()).save(any());
+    verify(userRepository, never()).findById(any());
     verify(notificationService, never()).sendMilestoneNotification(any(), anyInt(), any());
   }
 
+  /**
+   * A streak of 5 is past the 3-day threshold without equalling any threshold. The milestone is
+   * still earned — matching on equality alone would lose it.
+   */
+  @Test
+  void awardsCrossedThreshold_whenStreakSitsBetweenThresholds() {
+    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(5);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 3)).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    consumer.onActivityCreated(event, 0, 0L);
+
+    ArgumentCaptor<StreakMilestone> captor = ArgumentCaptor.forClass(StreakMilestone.class);
+    verify(milestoneRepository).save(captor.capture());
+    assertThat(captor.getValue().getMilestoneDays()).isEqualTo(3);
+    verify(notificationService).sendMilestoneNotification(user, 3, activityId);
+  }
+
+  /**
+   * Regression: a bulk CSV import or the Google Health initial backfill commits every activity
+   * before any event is consumed, so the streak arrives at its final value rather than passing
+   * through each threshold on consecutive days. Matching on equality awarded nothing at all for a
+   * 31-day backfill, because 31 is not itself a threshold.
+   */
+  @Test
+  void awardsEveryCrossedThreshold_whenBackfillJumpsTheStreak() {
+    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(31);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(eq(userId), anyInt())).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    consumer.onActivityCreated(event, 0, 0L);
+
+    ArgumentCaptor<StreakMilestone> captor = ArgumentCaptor.forClass(StreakMilestone.class);
+    verify(milestoneRepository, times(4)).save(captor.capture());
+
+    assertThat(captor.getAllValues())
+        .extracting(StreakMilestone::getMilestoneDays)
+        .containsExactly(3, 7, 14, 30);
+
+    // One notification only, for the highest crossed — not four.
+    verify(notificationService, times(1)).sendMilestoneNotification(any(), anyInt(), any());
+    verify(notificationService).sendMilestoneNotification(user, 30, activityId);
+  }
+
+  @Test
+  void skipsAlreadyEarnedThresholds_whenBackfillingOverExistingMilestones() {
+    when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(30);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 3)).thenReturn(true);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 7)).thenReturn(true);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 14)).thenReturn(false);
+    when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, 30)).thenReturn(false);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    consumer.onActivityCreated(event, 0, 0L);
+
+    ArgumentCaptor<StreakMilestone> captor = ArgumentCaptor.forClass(StreakMilestone.class);
+    verify(milestoneRepository, times(2)).save(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(StreakMilestone::getMilestoneDays)
+        .containsExactly(14, 30);
+
+    verify(notificationService).sendMilestoneNotification(user, 30, activityId);
+  }
+
+  /**
+   * Day-to-day use: the streak lands exactly on a threshold with all lower ones already earned, so
+   * exactly one milestone is saved and one notification sent.
+   */
   @Test
   void savesCorrectMilestone_forEachThreshold() {
-    for (int threshold : new int[] {7, 14, 30, 60, 100, 365}) {
+    int[] thresholds = {3, 7, 14, 30, 60, 100, 365};
+    for (int i = 0; i < thresholds.length; i++) {
+      int threshold = thresholds[i];
       reset(summaryService, milestoneRepository, userRepository, notificationService);
 
       when(summaryService.getCurrentStreak(userId, ZoneOffset.UTC)).thenReturn(threshold);
+      for (int j = 0; j < i; j++) {
+        when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, thresholds[j]))
+            .thenReturn(true);
+      }
       when(milestoneRepository.existsByUserIdAndMilestoneDays(userId, threshold)).thenReturn(false);
       when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
@@ -126,6 +201,7 @@ class ActivityEventConsumerTest {
       ArgumentCaptor<StreakMilestone> captor = ArgumentCaptor.forClass(StreakMilestone.class);
       verify(milestoneRepository).save(captor.capture());
       assertThat(captor.getValue().getMilestoneDays()).isEqualTo(threshold);
+      verify(notificationService).sendMilestoneNotification(user, threshold, activityId);
     }
   }
 }
