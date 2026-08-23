@@ -81,4 +81,14 @@ public class OutboxEvent {
 
   @Column(name = "sent_at")
   private LocalDateTime sentAt;
+
+  /**
+   * Earliest time the relay may retry this row after a failure. {@code null} means eligible now,
+   * which is the state of every freshly inserted row and of every row written before V4.
+   *
+   * <p>Set by {@code OutboxRelay} to an exponentially growing offset so a Kafka outage lasting
+   * longer than {@code maxAttempts} poll intervals does not park every affected row as FAILED.
+   */
+  @Column(name = "next_attempt_at")
+  private LocalDateTime nextAttemptAt;
 }

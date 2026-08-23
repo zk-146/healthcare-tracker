@@ -23,6 +23,15 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
    * <p>{@code SKIP LOCKED} is close to a no-op with a single instance and a single scheduler
    * thread. It costs nothing and means scaling out later cannot double-publish.
    *
+   * <p>Rows whose retry backoff has not elapsed are skipped. {@code next_attempt_at IS NULL} means
+   * "eligible now" and covers every first attempt as well as every row written before V4. The
+   * comparison is against {@code now() AT TIME ZONE 'UTC'} because the column is {@code TIMESTAMP}
+   * without a zone and the relay writes {@code LocalDateTime.now(ZoneOffset.UTC)} into it; a bare
+   * {@code now()} would be interpreted in the database session's zone instead.
+   *
+   * <p>Ordering stays on {@code id}, not {@code next_attempt_at}, to preserve the near-FIFO drain
+   * among rows that are eligible.
+   *
    * <p>PostgreSQL-only syntax. H2 cannot run this, which is why it is covered by {@code
    * OutboxEventRepositoryPostgresTest} rather than the main suite. Native queries are not validated
    * at context startup, so its presence does not break the H2 slices.
@@ -32,6 +41,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
           """
           SELECT * FROM activity_outbox
           WHERE status = 'PENDING'
+            AND (next_attempt_at IS NULL OR next_attempt_at <= (now() AT TIME ZONE 'UTC'))
           ORDER BY id
           LIMIT :limit
           FOR UPDATE SKIP LOCKED

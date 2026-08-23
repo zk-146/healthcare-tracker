@@ -50,6 +50,16 @@ spring:
       properties:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
+        # OutboxRelay.drain() sends from inside an open transaction holding FOR UPDATE locks on
+        # the claimed rows, so the producer must never block on the Kafka defaults (60s/120s).
+        # max.block.ms caps how long a single send() waits on metadata; delivery.timeout.ms
+        # guarantees a send that got metadata eventually completes its future instead of hanging.
+        # Kafka requires delivery.timeout.ms >= request.timeout.ms + linger.ms (30s + 0 by
+        # default), which 15000 does not satisfy on paper — so request.timeout.ms is lowered to
+        # match. 10s is ample for a local/in-cluster broker.
+        max.block.ms: 5000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 15000
     consumer:
       group-id: activity-tracker-consumers
       auto-offset-reset: earliest

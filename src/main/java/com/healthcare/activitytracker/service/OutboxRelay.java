@@ -6,6 +6,7 @@ import com.healthcare.activitytracker.model.entity.OutboxEvent;
 import com.healthcare.activitytracker.model.enums.OutboxStatus;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.OutboxEventRepository;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -47,6 +48,9 @@ public class OutboxRelay {
    */
   private static final int MAX_ERROR_LENGTH = 2000;
 
+  /** Ceiling on the exponential retry backoff between attempts. */
+  private static final long MAX_BACKOFF_SECONDS = 300;
+
   private final OutboxEventRepository outboxRepository;
   private final KafkaTemplate<String, ActivityCreatedEvent> kafkaTemplate;
   private final ObjectMapper objectMapper;
@@ -63,6 +67,30 @@ public class OutboxRelay {
     this.properties = properties;
   }
 
+  /**
+   * Claims a batch, publishes it, and records the outcome — all inside one transaction holding
+   * {@code FOR UPDATE} locks on the claimed rows. Every blocking call in here is therefore bounded
+   * deliberately.
+   *
+   * <p><strong>The await phase.</strong> {@code sendTimeoutMs} bounds the batch <em>as a
+   * whole</em>, not each {@code Future.get} in isolation. One deadline is established before the
+   * first send is fired, and every await computes what remains of it, so N rows share a single
+   * timeout window instead of getting N independent ones. Passing the full {@code sendTimeoutMs} to
+   * each {@code get} would let a stalled batch of 100 rows hold their locks for 100 times the
+   * configured budget.
+   *
+   * <p><strong>The fire phase.</strong> That deadline cannot bound the fire loop, because {@code
+   * KafkaProducer.send} blocks in {@code waitOnMetadata} rather than handing back a future to
+   * await. It is bounded instead by the producer settings in {@code application.yml}: {@code
+   * max.block.ms=5000} caps how long a single {@code send} waits for metadata, and {@code
+   * delivery.timeout.ms=15000} guarantees a send that did get metadata eventually completes its
+   * future rather than hanging. Both are set explicitly because the Kafka defaults — 60s and 120s —
+   * are far too long to sit on inside an open transaction.
+   *
+   * <p>Note that {@code kafkaTemplate.flush()} already blocks until every in-flight future
+   * completes, so in the normal case the await loop finds the budget untouched. It exists to bound
+   * the pathological case, not the common one.
+   */
   @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:1000}")
   @Transactional
   public void drain() {
@@ -70,6 +98,9 @@ public class OutboxRelay {
     if (rows.isEmpty()) {
       return;
     }
+
+    long deadlineNanos =
+        System.nanoTime() + Duration.ofMillis(properties.getSendTimeoutMs()).toNanos();
 
     Map<OutboxEvent, CompletableFuture<SendResult<String, ActivityCreatedEvent>>> inFlight =
         new LinkedHashMap<>();
@@ -91,7 +122,9 @@ public class OutboxRelay {
           entry : inFlight.entrySet()) {
         OutboxEvent row = entry.getKey();
         try {
-          entry.getValue().get(properties.getSendTimeoutMs(), TimeUnit.MILLISECONDS);
+          entry
+              .getValue()
+              .get(remainingBudgetMillis(deadlineNanos, System.nanoTime()), TimeUnit.MILLISECONDS);
           row.setStatus(OutboxStatus.SENT);
           row.setSentAt(LocalDateTime.now(ZoneOffset.UTC));
           log.debug("Published outbox row {} eventId={}", row.getId(), row.getEventId());
@@ -105,6 +138,18 @@ public class OutboxRelay {
     }
 
     outboxRepository.saveAll(rows);
+  }
+
+  /**
+   * Milliseconds left of the shared send deadline for a batch, floored at zero.
+   *
+   * <p>Package-private so the arithmetic is unit-testable with fixed values instead of by racing a
+   * wall clock. Zero means poll the future and give up immediately: the batch budget is spent, and
+   * any row still unacknowledged is recorded as a failure and retried on a later poll.
+   */
+  static long remainingBudgetMillis(long deadlineNanos, long nowNanos) {
+    long remainingNanos = deadlineNanos - nowNanos;
+    return remainingNanos <= 0 ? 0L : TimeUnit.NANOSECONDS.toMillis(remainingNanos);
   }
 
   /**
@@ -131,6 +176,8 @@ public class OutboxRelay {
 
     if (row.getAttempts() >= properties.getMaxAttempts()) {
       row.setStatus(OutboxStatus.FAILED);
+      // No nextAttemptAt here: claimPending filters on status = PENDING, so a parked row is never
+      // reconsidered and a backoff on it would mean nothing.
       log.error(
           "Outbox row {} parked as FAILED after {} attempts eventId={} lastError={}",
           row.getId(),
@@ -138,13 +185,29 @@ public class OutboxRelay {
           row.getEventId(),
           row.getLastError());
     } else {
+      long backoff = backoffSeconds(row.getAttempts());
+      row.setNextAttemptAt(LocalDateTime.now(ZoneOffset.UTC).plusSeconds(backoff));
       log.warn(
-          "Outbox publish failed for row {} on attempt {} eventId={}",
+          "Outbox publish failed for row {} on attempt {} eventId={}, retrying in {}s",
           row.getId(),
           row.getAttempts(),
           row.getEventId(),
+          backoff,
           e);
     }
+  }
+
+  /**
+   * Exponential backoff between retry attempts, capped at {@link #MAX_BACKOFF_SECONDS}.
+   *
+   * <p>Without a backoff a failing row is retried every poll interval and parks as {@code FAILED}
+   * after only {@code maxAttempts} times {@code poll-interval-ms} — about ten seconds at the
+   * shipped defaults, far shorter than any real Kafka outage. Doubling stretches the same ten
+   * attempts across roughly half an hour.
+   */
+  static long backoffSeconds(int attempts) {
+    double doubled = Math.pow(2, attempts);
+    return doubled >= MAX_BACKOFF_SECONDS ? MAX_BACKOFF_SECONDS : (long) doubled;
   }
 
   private static String truncate(String value) {

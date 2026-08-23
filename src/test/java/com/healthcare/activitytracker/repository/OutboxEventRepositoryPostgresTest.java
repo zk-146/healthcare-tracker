@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.healthcare.activitytracker.model.entity.OutboxEvent;
 import com.healthcare.activitytracker.model.enums.OutboxStatus;
+import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,10 +41,24 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class OutboxEventRepositoryPostgresTest {
 
+  /**
+   * {@code preferQueryMode=simple} is carried deliberately: it is what production runs (see the
+   * datasource URL in {@code application.yml}) and nothing else in the suite exercises it. {@link
+   * OutboxEvent} uses {@code GenerationType.IDENTITY}, so the driver mode is load-bearing for every
+   * insert here.
+   *
+   * <p>The parameter is attached with {@code withUrlParam} rather than a
+   * {@code @DynamicPropertySource} override of {@code spring.datasource.url}, because
+   * {@code @ServiceConnection} contributes a {@code JdbcConnectionDetails} bean that takes
+   * precedence over the property — the override would be silently ignored. {@code withUrlParam}
+   * feeds the container's own {@code getJdbcUrl()}, which is what those connection details return.
+   */
   @Container @ServiceConnection
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+  static PostgreSQLContainer<?> postgres =
+      new PostgreSQLContainer<>("postgres:16-alpine").withUrlParam("preferQueryMode", "simple");
 
   @Autowired private OutboxEventRepository outboxRepository;
+  @Autowired private DataSource dataSource;
 
   @BeforeEach
   void setUp() {
@@ -50,6 +66,10 @@ class OutboxEventRepositoryPostgresTest {
   }
 
   private OutboxEvent row(OutboxStatus status, LocalDateTime sentAt) {
+    return row(status, sentAt, null);
+  }
+
+  private OutboxEvent row(OutboxStatus status, LocalDateTime sentAt, LocalDateTime nextAttemptAt) {
     return OutboxEvent.builder()
         .eventId(UUID.randomUUID())
         .aggregateId(UUID.randomUUID())
@@ -60,7 +80,15 @@ class OutboxEventRepositoryPostgresTest {
         .status(status)
         .attempts(0)
         .sentAt(sentAt)
+        .nextAttemptAt(nextAttemptAt)
         .build();
+  }
+
+  @Test
+  void connectsWithTheSameDriverModeProductionUses() throws Exception {
+    try (Connection connection = dataSource.getConnection()) {
+      assertThat(connection.getMetaData().getURL()).contains("preferQueryMode=simple");
+    }
   }
 
   @Test
@@ -84,6 +112,23 @@ class OutboxEventRepositoryPostgresTest {
     outboxRepository.save(row(OutboxStatus.PENDING, null));
 
     assertThat(outboxRepository.claimPending(2)).hasSize(2);
+  }
+
+  @Test
+  void claimPendingSkipsRowsWhoseBackoffHasNotElapsed() {
+    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+    OutboxEvent notYetDue =
+        outboxRepository.save(row(OutboxStatus.PENDING, null, now.plusMinutes(5)));
+    OutboxEvent backoffElapsed =
+        outboxRepository.save(row(OutboxStatus.PENDING, null, now.minusMinutes(5)));
+    OutboxEvent neverAttempted = outboxRepository.save(row(OutboxStatus.PENDING, null, null));
+
+    List<OutboxEvent> claimed = outboxRepository.claimPending(10);
+
+    assertThat(claimed)
+        .extracting(OutboxEvent::getId)
+        .containsExactly(backoffElapsed.getId(), neverAttempted.getId())
+        .doesNotContain(notYetDue.getId());
   }
 
   @Test
