@@ -107,6 +107,24 @@ public class OutboxRelay {
     outboxRepository.saveAll(rows);
   }
 
+  /**
+   * Deletes published rows past the retention window, so the outbox does not grow without bound.
+   *
+   * <p>Only {@code SENT} rows are eligible. {@code FAILED} rows are retained indefinitely and on
+   * purpose: they are the record of events that never reached Kafka, and deleting them would
+   * destroy the only evidence that something was lost.
+   */
+  @Scheduled(fixedDelayString = "${app.outbox.purge-interval-ms:86400000}")
+  @Transactional
+  public void purgeSent() {
+    LocalDateTime cutoff =
+        LocalDateTime.now(ZoneOffset.UTC).minusDays(properties.getRetentionDays());
+    int deleted = outboxRepository.purgeSentBefore(OutboxStatus.SENT, cutoff);
+    if (deleted > 0) {
+      log.info("Purged {} sent outbox rows older than {}", deleted, cutoff);
+    }
+  }
+
   private void recordFailure(OutboxEvent row, Exception e) {
     row.setAttempts(row.getAttempts() + 1);
     row.setLastError(truncate(e.toString()));
