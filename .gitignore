@@ -107,3 +107,6 @@ docs/
 *.swp
 *.swo
 *~
+
+# Frontend build output copied in by the Docker ui stage
+src/main/resources/static/
