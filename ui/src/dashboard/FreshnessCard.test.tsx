@@ -29,6 +29,13 @@ describe('FreshnessCard', () => {
     expect(container.querySelector('[data-stale="true"]')).toBeNull();
   });
 
+  it('is not stale at exactly the staleness boundary (two days old)', () => {
+    const { container } = render(
+      <FreshnessCard latestDayKey="2026-08-25" today={today} status={null} />,
+    );
+    expect(container.querySelector('[data-stale="true"]')).toBeNull();
+  });
+
   it('prompts to reconnect when the integration needs reauthorisation', () => {
     render(
       <FreshnessCard
@@ -38,6 +45,17 @@ describe('FreshnessCard', () => {
       />,
     );
     expect(screen.getByText(/reconnect/i)).toBeInTheDocument();
+  });
+
+  it('flags itself as stale when reconnect is required even if the data is fresh', () => {
+    const { container } = render(
+      <FreshnessCard
+        latestDayKey="2026-08-27"
+        today={today}
+        status={{ connected: true, status: 'NEEDS_RECONNECT', lastSyncedAt: '2026-08-20T04:00:00' }}
+      />,
+    );
+    expect(container.querySelector('[data-stale="true"]')).not.toBeNull();
   });
 
   it('says the watch is not connected when it is not', () => {
