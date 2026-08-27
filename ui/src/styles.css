@@ -1,0 +1,241 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --text: #1b1b19;
+  --muted: #6b6b66;
+  --line: rgba(0, 0, 0, 0.1);
+  --accent: #3b6ea5;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --surface: #202024;
+    --text: #ececea;
+    --muted: #9a9a95;
+    --line: rgba(255, 255, 255, 0.12);
+    --accent: #78a6d8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat {
+  text-align: center;
+  padding: 10px 4px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: 10px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.streak-value {
+  display: block;
+  text-align: center;
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.streak-label,
+.streak-hint {
+  display: block;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.streak-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  margin: 14px 24px 8px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 88px;
+}
+
+.chart-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.chart-bar[data-empty='true'] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.chart-axis,
+.chart-totals {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.chart-axis span {
+  flex: 1;
+  text-align: center;
+}
+
+.day-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  margin-bottom: 6px;
+}
+
+.day-row-metrics {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.freshness {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.freshness[data-stale='true'] {
+  border-color: color-mix(in srgb, #c2410c 45%, var(--line));
+}
+
+.skeleton {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.error-note {
+  margin: 0;
+  font-size: 13px;
+  color: #c2410c;
+}
+
+.empty-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login {
+  max-width: 360px;
+  margin: 15vh auto 0;
+  padding: 0 20px;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.login input {
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.login button {
+  margin-top: 16px;
+  padding: 12px;
+  font-size: 15px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.login button:disabled {
+  opacity: 0.6;
+}
+
+.error {
+  color: #c2410c;
+  font-size: 13px;
+  margin: 8px 0 0;
+}
