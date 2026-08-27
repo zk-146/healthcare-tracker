@@ -87,9 +87,21 @@ export function createApiClient(
         const next: Tokens = { token: auth.token, refreshToken: auth.refreshToken };
         store.set(next);
         return next;
-      })().finally(() => {
-        refreshInFlight = null;
-      });
+      })()
+        // This .catch runs exactly once per failed refresh attempt, no matter how many
+        // concurrent callers are awaiting the shared `refreshInFlight` promise below — a
+        // rejected promise re-throws independently at each `await` site, but the handler
+        // attached to the promise itself only executes once. Resetting refreshInFlight in
+        // .finally (not here) means a later, separate refresh failure creates a fresh
+        // promise with its own .catch, so onAuthFailure is not permanently latched.
+        .catch((err: unknown) => {
+          store.clear();
+          onAuthFailure();
+          throw err;
+        })
+        .finally(() => {
+          refreshInFlight = null;
+        });
     }
     return refreshInFlight;
   }
@@ -101,8 +113,6 @@ export function createApiClient(
       try {
         await refresh();
       } catch {
-        store.clear();
-        onAuthFailure();
         throw new ApiError(401, null);
       }
       response = await send(path, init);

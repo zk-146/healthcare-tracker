@@ -119,4 +119,30 @@ describe('createApiClient', () => {
     await expect(api.get('/api/v1/summary/daily')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('signals auth failure exactly once when three concurrent 401s share a rejected refresh', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/v1/auth/refresh') {
+        return jsonResponse({ status: 401, error: 'Unauthorized' }, 401);
+      }
+      return jsonResponse({ status: 401, error: 'Unauthorized' }, 401);
+    });
+
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    const results = await Promise.allSettled([
+      api.get('/api/v1/a'),
+      api.get('/api/v1/b'),
+      api.get('/api/v1/c'),
+    ]);
+
+    for (const result of results) {
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect(result.reason).toBeInstanceOf(ApiError);
+      }
+    }
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
+    expect(store.current).toBeNull();
+  });
 });
