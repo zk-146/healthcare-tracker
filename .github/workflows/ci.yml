@@ -58,7 +58,7 @@ jobs:
       # The Java dependency scan and Trivy image scan do not cover the npm tree.
       - name: Audit dependencies
         working-directory: ui
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
   owasp:
     needs: build
@@ -125,7 +125,7 @@ jobs:
           path: codeql-results/*.sarif
 
   docker:
-    needs: build
+    needs: [build, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

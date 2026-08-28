@@ -84,6 +84,7 @@ venv/
 # Stitch / Claude artifacts
 # ========================
 .stitch/
+.superpowers/
 generation_log.json
 screen_prompts.py
 generate_screens.py

@@ -116,6 +116,11 @@ export function createApiClient(
         throw new ApiError(401, null);
       }
       response = await send(path, init);
+      if (response.status === 401) {
+        store.clear();
+        onAuthFailure();
+        throw new ApiError(401, null);
+      }
     }
 
     if (!response.ok) {
