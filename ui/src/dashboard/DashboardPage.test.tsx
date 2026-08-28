@@ -135,4 +135,45 @@ describe('DashboardPage', () => {
       expect(screen.getByText(/no activity data yet/i)).toBeInTheDocument(),
     );
   });
+
+  it('reports real staleness instead of "no data" when the newest row is outside the 7-day chart window', async () => {
+    const staleActivitiesPage = {
+      ...activitiesPage,
+      content: [{ ...activitiesPage.content[0], startedAt: '2026-08-22T00:00:00' }],
+    };
+    const farFutureToday = new Date(2026, 8, 5); // 14 days after the fixture's 22 Aug row
+
+    const api = apiReturning({
+      '/api/v1/summary/daily': summary,
+      '/api/v1/activities': staleActivitiesPage,
+      '/api/v1/integrations/google-health/status': {
+        connected: true,
+        status: 'CONNECTED',
+        lastSyncedAt: '2026-08-22T04:00:00',
+      },
+    });
+
+    render(<DashboardPage api={api} onSignOut={vi.fn()} today={farFutureToday} />);
+
+    await waitFor(() => expect(screen.getByText(/14 days ago/i)).toBeInTheDocument());
+    expect(screen.queryByText(/no activity data yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no data imported yet/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces an error instead of silently truncating when the window has more rows than one page', async () => {
+    const truncatedPage = { ...activitiesPage, totalElements: 150 };
+    const api = apiReturning({
+      '/api/v1/summary/daily': summary,
+      '/api/v1/activities': truncatedPage,
+      '/api/v1/integrations/google-health/status': {
+        connected: false,
+        status: null,
+        lastSyncedAt: null,
+      },
+    });
+
+    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+
+    await waitFor(() => expect(screen.getByText(/truncated/i)).toBeInTheDocument());
+  });
 });

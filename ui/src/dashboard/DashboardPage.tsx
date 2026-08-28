@@ -11,7 +11,8 @@ import { RecentDaysList } from './RecentDaysList';
 import { SevenDayChart } from './SevenDayChart';
 import { StreakHero } from './StreakHero';
 
-const WINDOW_DAYS = 7;
+const LOOKBACK_DAYS = 30; // fetch window: wide enough to find the newest row even when stale
+const CHART_DAYS = 7;     // display window: what the chart and recent-days list show
 
 interface DashboardPageProps {
   api: ApiClient;
@@ -28,6 +29,9 @@ function messageFor(cause: unknown): string {
       return 'Too many requests — wait a minute and reload.';
     }
     return cause.body?.error ?? `Request failed (${cause.status})`;
+  }
+  if (cause instanceof Error) {
+    return cause.message;
   }
   return 'Could not reach the server.';
 }
@@ -59,19 +63,30 @@ function useLoadable<T>(load: () => Promise<T>, deps: unknown[]): Loadable<T> {
 }
 
 export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardPageProps) {
-  const dayKeys = rollingWindow(today, WINDOW_DAYS);
-  const from = dayKeys[0];
-  const to = dayKeys[dayKeys.length - 1];
+  const lookbackKeys = rollingWindow(today, LOOKBACK_DAYS);
+  const chartKeys = lookbackKeys.slice(-CHART_DAYS);
+  const from = lookbackKeys[0];
+  const to = lookbackKeys[lookbackKeys.length - 1];
 
   const summary = useLoadable<SummaryResponse>(() => getDailySummary(api), [api]);
   const activities = useLoadable<ActivityResponse[]>(
-    () => listActivities(api, from, to).then((page) => page.content),
+    () =>
+      listActivities(api, from, to).then((page) => {
+        if (page.totalElements > page.content.length) {
+          throw new Error(
+            `Activity data was truncated: ${page.totalElements} rows exist for this window but only ${page.content.length} were loaded.`,
+          );
+        }
+        return page.content;
+      }),
     [api, from, to],
   );
   const sync = useLoadable<GoogleHealthStatusResponse>(() => getSyncStatus(api), [api]);
 
-  const buckets: DayBucket[] =
-    activities.state === 'ready' ? bucketByDay(activities.value, dayKeys) : [];
+  const lookbackBuckets: DayBucket[] =
+    activities.state === 'ready' ? bucketByDay(activities.value, lookbackKeys) : [];
+  const chartBuckets: DayBucket[] =
+    activities.state === 'ready' ? bucketByDay(activities.value, chartKeys) : [];
 
   const latestDayKey =
     activities.state === 'ready' && activities.value.length > 0
@@ -81,7 +96,7 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
           .at(-1) ?? null
       : null;
 
-  const latestBucket = buckets.find((bucket) => bucket.dayKey === latestDayKey) ?? null;
+  const latestBucket = lookbackBuckets.find((bucket) => bucket.dayKey === latestDayKey) ?? null;
 
   return (
     <main className="page">
@@ -101,8 +116,8 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
       {activities.state === 'ready' && (
         <>
           <LatestDayCard bucket={latestBucket} />
-          <SevenDayChart buckets={buckets} />
-          <RecentDaysList buckets={buckets} />
+          <SevenDayChart buckets={chartBuckets} />
+          <RecentDaysList buckets={chartBuckets} />
         </>
       )}
 
@@ -111,6 +126,7 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
           latestDayKey={latestDayKey}
           today={today}
           status={sync.state === 'ready' ? sync.value : null}
+          syncError={sync.state === 'error'}
         />
       )}
     </main>

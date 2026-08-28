@@ -145,4 +145,26 @@ describe('createApiClient', () => {
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
     expect(store.current).toBeNull();
   });
+
+  it('clears tokens and signals auth failure when the retried request is still 401 after a successful refresh', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/v1/auth/refresh') {
+        return jsonResponse({
+          token: 'access-2',
+          refreshToken: 'refresh-2',
+          expiresIn: 3600,
+          userId: 'u1',
+          email: 'z@example.com',
+        });
+      }
+      // Every call to the real endpoint keeps returning 401, even after a successful refresh.
+      return jsonResponse({ status: 401, error: 'Unauthorized' }, 401);
+    });
+
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    await expect(api.get('/api/v1/summary/daily')).rejects.toBeInstanceOf(ApiError);
+    expect(store.current).toBeNull();
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
+  });
 });

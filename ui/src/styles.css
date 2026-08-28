@@ -6,6 +6,8 @@
   --muted: #6b6b66;
   --line: rgba(0, 0, 0, 0.1);
   --accent: #3b6ea5;
+  --danger: #c2410c;
+  --on-accent: #ffffff;
   --radius: 12px;
 }
 
@@ -17,6 +19,8 @@
     --muted: #9a9a95;
     --line: rgba(255, 255, 255, 0.12);
     --accent: #78a6d8;
+    --danger: #f0805a;
+    --on-accent: #14202b;
   }
 }
 
@@ -173,7 +177,7 @@ body {
 }
 
 .freshness[data-stale='true'] {
-  border-color: color-mix(in srgb, #c2410c 45%, var(--line));
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
 }
 
 .skeleton {
@@ -184,7 +188,7 @@ body {
 .error-note {
   margin: 0;
   font-size: 13px;
-  color: #c2410c;
+  color: var(--danger);
 }
 
 .empty-note {
@@ -227,7 +231,7 @@ body {
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .login button:disabled {
@@ -235,7 +239,7 @@ body {
 }
 
 .error {
-  color: #c2410c;
+  color: var(--danger);
   font-size: 13px;
   margin: 8px 0 0;
 }

@@ -6,6 +6,7 @@ interface FreshnessCardProps {
   latestDayKey: string | null;
   today: Date;
   status: GoogleHealthStatusResponse | null;
+  syncError?: boolean;
 }
 
 /** More than this many days behind and the card styles itself as a warning. */
@@ -25,7 +26,13 @@ function describeAge(latestDayKey: string | null, today: Date): string {
   return `Last data: ${formatDayLabel(latestDayKey)} (${age} days ago)`;
 }
 
-function describeConnection(status: GoogleHealthStatusResponse | null): string | null {
+function describeConnection(
+  status: GoogleHealthStatusResponse | null,
+  syncError: boolean,
+): string | null {
+  if (syncError) {
+    return 'Sync status unavailable';
+  }
   if (status === null) {
     return null;
   }
@@ -38,10 +45,10 @@ function describeConnection(status: GoogleHealthStatusResponse | null): string |
   return 'Watch connected';
 }
 
-export function FreshnessCard({ latestDayKey, today, status }: FreshnessCardProps) {
+export function FreshnessCard({ latestDayKey, today, status, syncError = false }: FreshnessCardProps) {
   const age = latestDayKey === null ? Number.POSITIVE_INFINITY : daysSince(latestDayKey, today);
   const stale = age > STALE_AFTER_DAYS || status?.status === 'NEEDS_RECONNECT';
-  const connection = describeConnection(status);
+  const connection = describeConnection(status, syncError);
 
   return (
     <Card>

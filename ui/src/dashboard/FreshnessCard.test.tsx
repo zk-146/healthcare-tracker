@@ -73,4 +73,9 @@ describe('FreshnessCard', () => {
     render(<FreshnessCard latestDayKey={null} today={today} status={null} />);
     expect(screen.getByText(/no data/i)).toBeInTheDocument();
   });
+
+  it('flags sync status as unavailable when the sync call itself failed', () => {
+    render(<FreshnessCard latestDayKey="2026-08-27" today={today} status={null} syncError />);
+    expect(screen.getByText(/sync status unavailable/i)).toBeInTheDocument();
+  });
 });
