@@ -30,6 +30,36 @@ jobs:
           name: test-reports
           path: target/surefire-reports/
 
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Test
+        working-directory: ui
+        run: npm test
+
+      - name: Build
+        working-directory: ui
+        run: npm run build
+
+      # The Java dependency scan and Trivy image scan do not cover the npm tree.
+      - name: Audit dependencies
+        working-directory: ui
+        run: npm audit --audit-level=high
+
   owasp:
     needs: build
     runs-on: ubuntu-latest
