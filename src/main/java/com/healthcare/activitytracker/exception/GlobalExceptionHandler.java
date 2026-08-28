@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -128,6 +129,17 @@ public class GlobalExceptionHandler {
             + "' has an invalid value"
             + (required == null ? "" : "; expected type " + required.getSimpleName());
     return buildResponse(HttpStatus.BAD_REQUEST, message);
+  }
+
+  /**
+   * A missing static resource (e.g. a bad asset path, or a client hitting a stale hashed filename)
+   * is a 404, not a server error. Without this handler it falls through to {@link #handleGeneral}
+   * and surfaces as a 500 — this is what SecurityConfigTest's
+   * staticShellIsNotRejectedAsUnauthorized guards against.
+   */
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
+    return buildResponse(HttpStatus.NOT_FOUND, "Not found");
   }
 
   @ExceptionHandler(Exception.class)
