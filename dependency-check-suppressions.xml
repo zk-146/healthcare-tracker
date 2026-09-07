@@ -19,10 +19,9 @@
         on the list, so the packageUrl patterns cover the whole group. They stay scoped to the
         two groupIds: an identical CVE id against any other dependency is still reported.
 
-        CVE-2026-65898 (DOMPurify inside swagger-ui) is suppressed below. It is easy to
-        misread: dependency-check prints 5.1, which is the CVSS v4.0 score, but the gate
-        compares the v3.1 score of 7.2 and fails on it. It clears on its own when springdoc
-        ships a swagger-ui carrying DOMPurify >= 3.4.11.
+        Nothing else is suppressed here. The swagger-ui DOMPurify CVEs, CVE-2026-65898
+        among them, used to need an entry; they are fixed properly now by pinning
+        org.webjars:swagger-ui to 5.32.14 in pom.xml, which bundles DOMPurify 3.4.13.
     -->
 
     <!-- ===== Spring Framework 6.2.19 (fix 6.2.20 unpublished) ===== -->
@@ -119,28 +118,5 @@
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-59270</cve>
-    </suppress>
-
-    <!-- ===== swagger-ui bundled DOMPurify 3.3.2 (fix 3.4.11 not yet in any springdoc release) ===== -->
-
-    <suppress until="2026-12-31Z">
-        <notes><![CDATA[
-            DOMPurify before 3.4.11 lets an uponSanitizeAttribute hook persist changes to the
-            ALLOWED_ATTR allowlist across calls. It reaches us only as a transitive bundle
-            inside the swagger-ui webjar that springdoc 2.8.17 ships; nothing in this project
-            calls DOMPurify, and the React frontend does not depend on it (no dompurify entry
-            in ui/package.json or ui/package-lock.json).
-
-            More to the point, the API documentation is not served in production at all:
-            application-prod.yml sets springdoc.api-docs.enabled=false and
-            springdoc.swagger-ui.enabled=false, so those paths return 404 and the vulnerable
-            script is never delivered to a browser.
-
-            Note on the score: dependency-check displays 5.1 (CVSS v4.0) but failBuildOnCVSS
-            compares the v3.1 score, which is 7.2 - which is why this fails the build despite
-            appearing to sit under the threshold.
-        ]]></notes>
-        <packageUrl regex="true">^pkg:javascript/DOMPurify@.*$</packageUrl>
-        <cve>CVE-2026-65898</cve>
     </suppress>
 </suppressions>
