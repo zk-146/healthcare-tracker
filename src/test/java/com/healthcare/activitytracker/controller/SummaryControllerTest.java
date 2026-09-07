@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.healthcare.activitytracker.config.SecurityConfig;
+import com.healthcare.activitytracker.model.dto.DigestResponse;
 import com.healthcare.activitytracker.model.dto.SummaryResponse;
+import com.healthcare.activitytracker.service.ActivityDigestService;
 import com.healthcare.activitytracker.service.SummaryService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
@@ -35,6 +37,7 @@ class SummaryControllerTest {
 
   @Autowired MockMvc mockMvc;
   @MockBean SummaryService summaryService;
+  @MockBean ActivityDigestService activityDigestService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
@@ -129,5 +132,30 @@ class SummaryControllerTest {
                 .param("to", "2024-01-31")
                 .header("X-User-Timezone", "Not/A/Zone"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void getDigest_returns200_withGeneratedDigest() throws Exception {
+    when(activityDigestService.generateDigest(any(), any(), any()))
+        .thenReturn(
+            DigestResponse.builder()
+                .period("weekly")
+                .from(LocalDate.now().minusDays(6))
+                .to(LocalDate.now())
+                .available(true)
+                .digest("Nice week of training!")
+                .build());
+
+    mockMvc
+        .perform(get("/api/v1/summary/digest").with(uuidUser()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true))
+        .andExpect(jsonPath("$.digest").value("Nice week of training!"))
+        .andExpect(jsonPath("$.period").value("weekly"));
+  }
+
+  @Test
+  void getDigest_returns401_whenUnauthenticated() throws Exception {
+    mockMvc.perform(get("/api/v1/summary/digest")).andExpect(status().isUnauthorized());
   }
 }

@@ -30,6 +30,36 @@ jobs:
           name: test-reports
           path: target/surefire-reports/
 
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Test
+        working-directory: ui
+        run: npm test
+
+      - name: Build
+        working-directory: ui
+        run: npm run build
+
+      # The Java dependency scan and Trivy image scan do not cover the npm tree.
+      - name: Audit dependencies
+        working-directory: ui
+        run: npm audit --audit-level=high --omit=dev
+
   owasp:
     needs: build
     runs-on: ubuntu-latest
@@ -44,10 +74,33 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # setup-java's maven cache only saves on a miss, and build/codeql share its key, so
+      # they win the race and this job's freshly downloaded NVD database was never persisted
+      # -- a full ~390k-CVE pull on every run. A dedicated cache keyed on run_id always
+      # misses (so it always saves) while restore-keys brings back the newest prior copy,
+      # leaving dependency-check an incremental delta to fetch.
+      - name: Restore NVD database
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nvd-${{ runner.os }}-
+
       # Enforcing: fails the job on any dependency with CVSS >= 7
       # (failBuildOnCVSS=7 configured in pom.xml)
       - name: OWASP Dependency Check
         run: mvn dependency-check:check -B -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+
+      # Split from the restore deliberately. actions/cache skips its save step when the job
+      # has failed, and this job fails by design whenever a CVE breaches the threshold -- so
+      # a combined cache action would never persist the database on exactly the runs that
+      # are red, leaving every one of them to re-download all ~390k CVEs.
+      - name: Save NVD database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload OWASP report
         if: always()
@@ -62,11 +115,20 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # Required to publish results to the Security tab.
+      security-events: write
+
+    strategy:
+      # One language failing should not hide the other language's results.
+      fail-fast: false
+      matrix:
+        language: [java, javascript-typescript]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
+        if: matrix.language == 'java'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -76,26 +138,30 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: java
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Build for CodeQL
+        if: matrix.language == 'java'
         run: mvn compile -B
 
+      # Results are uploaded to code scanning rather than written only to an artifact.
+      # With `upload: never` a finding of any severity still produced a green check, so the
+      # job could not surface anything it found.
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           output: codeql-results
-          upload: never
 
       - name: Upload CodeQL SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: codeql-results
+          name: codeql-results-${{ matrix.language }}
           path: codeql-results/*.sarif
 
   docker:
-    needs: build
+    needs: [build, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

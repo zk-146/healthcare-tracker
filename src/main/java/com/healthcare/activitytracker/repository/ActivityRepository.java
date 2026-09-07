@@ -34,12 +34,18 @@ public interface ActivityRepository
   @Query("DELETE FROM Activity a WHERE a.user.id = :userId")
   int deleteAllByUserId(@Param("userId") UUID userId);
 
+  /**
+   * The CASTs are load-bearing on PostgreSQL. A parameter whose only appearance is {@code ? IS
+   * NULL} gives the planner nothing to infer a type from, and Postgres rejects the statement with
+   * "could not determine data type of parameter". The comparison arms need no cast — the column
+   * supplies the type there. H2 infers either way, so this only ever failed against real Postgres.
+   */
   @Query(
       "SELECT a FROM Activity a WHERE a.user.id = :userId "
-          + "AND (:from IS NULL OR a.startedAt >= :from) "
-          + "AND (:to IS NULL OR a.startedAt <= :to) "
-          + "AND (:activityType IS NULL OR a.activityType = :activityType) "
-          + "AND (:source IS NULL OR a.source = :source) "
+          + "AND (CAST(:from AS LocalDateTime) IS NULL OR a.startedAt >= :from) "
+          + "AND (CAST(:to AS LocalDateTime) IS NULL OR a.startedAt <= :to) "
+          + "AND (CAST(:activityType AS String) IS NULL OR a.activityType = :activityType) "
+          + "AND (CAST(:source AS String) IS NULL OR a.source = :source) "
           + "ORDER BY a.startedAt DESC")
   Page<Activity> findByFilters(
       @Param("userId") UUID userId,

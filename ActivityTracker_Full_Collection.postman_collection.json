@@ -1,0 +1,512 @@
+{
+  "info": {
+    "name": "Activity Tracker - Full API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "activityId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"StrongPass123!@#\",\n  \"fullName\": \"Test User\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.token) { pm.collectionVariables.set('accessToken', b.token); }",
+                  "if (b.refreshToken) { pm.collectionVariables.set('refreshToken', b.refreshToken); }",
+                  "pm.test('got tokens', function () { pm.expect(pm.collectionVariables.get('accessToken')).to.not.be.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"StrongPass123!@#\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.token) { pm.collectionVariables.set('accessToken', b.token); }",
+                  "if (b.refreshToken) { pm.collectionVariables.set('refreshToken', b.refreshToken); }",
+                  "pm.test('got tokens', function () { pm.expect(pm.collectionVariables.get('accessToken')).to.not.be.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.token) { pm.collectionVariables.set('accessToken', b.token); }",
+                  "if (b.refreshToken) { pm.collectionVariables.set('refreshToken', b.refreshToken); }",
+                  "pm.test('got tokens', function () { pm.expect(pm.collectionVariables.get('accessToken')).to.not.be.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"StrongPass123!@#\",\n  \"newPassword\": \"EvenStronger456!@#\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/change-password"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities",
+      "item": [
+        {
+          "name": "Create activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"WALKING\",\n  \"source\": \"MANUAL\",\n  \"deviceId\": \"fitbit-charge-6\",\n  \"startedAt\": \"2026-07-11T08:00:00\",\n  \"endedAt\": \"2026-07-11T08:30:00\",\n  \"durationMinutes\": 30,\n  \"distanceKm\": 2.5,\n  \"caloriesBurned\": 150,\n  \"heartRateAvg\": 110,\n  \"steps\": 3500,\n  \"notes\": \"morning walk\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.id) { pm.collectionVariables.set('activityId', b.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List activities (with filters)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/activities?activityType=WALKING&source=MANUAL&from=2026-01-01&to=2026-12-31&page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "activities"
+              ],
+              "query": [
+                {
+                  "key": "activityType",
+                  "value": "WALKING",
+                  "disabled": true
+                },
+                {
+                  "key": "source",
+                  "value": "MANUAL",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get activity by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Update activity",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityType\": \"RUNNING\",\n  \"source\": \"MANUAL\",\n  \"startedAt\": \"2026-07-11T08:00:00\",\n  \"endedAt\": \"2026-07-11T08:45:00\",\n  \"durationMinutes\": 45,\n  \"distanceKm\": 6.0,\n  \"caloriesBurned\": 400,\n  \"heartRateAvg\": 140,\n  \"steps\": 7000,\n  \"notes\": \"updated to a run\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        },
+        {
+          "name": "Delete activity",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import",
+      "item": [
+        {
+          "name": "Import Fitbit CSV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/v1/activities/import/fitbit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Google Health Integration",
+      "item": [
+        {
+          "name": "Connect (get OAuth URL)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/integrations/google-health/connect"
+          }
+        },
+        {
+          "name": "OAuth callback (browser redirect target)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/integrations/google-health/callback?code=&state="
+          }
+        },
+        {
+          "name": "Connection status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/integrations/google-health/status"
+          }
+        },
+        {
+          "name": "Disconnect",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/integrations/google-health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"dateOfBirth\": \"1995-06-15\",\n  \"gender\": \"male\",\n  \"heightCm\": 178.0,\n  \"weightKg\": 75.5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        },
+        {
+          "name": "Delete account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Summary",
+      "item": [
+        {
+          "name": "Custom range summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary?from=2026-01-01&to=2026-07-11"
+          }
+        },
+        {
+          "name": "Daily summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/daily"
+          }
+        },
+        {
+          "name": "Weekly summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/weekly"
+          }
+        },
+        {
+          "name": "Monthly summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/summary/monthly"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        }
+      ]
+    }
+  ]
+}

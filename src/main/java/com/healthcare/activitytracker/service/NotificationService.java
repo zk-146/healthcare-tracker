@@ -11,14 +11,23 @@ public class NotificationService {
 
   private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
+  private final MilestoneMessageService milestoneMessageService;
+
+  public NotificationService(MilestoneMessageService milestoneMessageService) {
+    this.milestoneMessageService = milestoneMessageService;
+  }
+
   public void sendMilestoneNotification(User user, int streakDays, UUID triggeringActivityId) {
     // The email address is deliberately NOT logged (HIPAA/PII policy: identifiers only).
-    // A real delivery integration should resolve the address at send time.
+    // A real delivery integration should resolve the address at send time. The generated
+    // message contains no personal data by construction (the prompt carries no name/email).
+    String message = milestoneMessageService.milestoneMessage(streakDays);
     log.info(
-        "NOTIFICATION userId={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={}",
+        "NOTIFICATION userId={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={} message=\"{}\"",
         user.getId(),
         streakDays,
-        triggeringActivityId);
+        triggeringActivityId,
+        message);
   }
 
   /**

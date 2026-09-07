@@ -1,0 +1,38 @@
+# Line-ending policy.
+#
+# Git already stores this repository's text as LF. Without this file a Windows
+# checkout with core.autocrlf=true produces a CRLF working tree, which then
+# fails `mvn spotless:check` whenever the build runs on Linux against that tree
+# (a Maven container, or a bind-mounted Docker build) — every file reports a
+# violation whose entire diff is \r\n -> \n. CI on ubuntu-latest never saw it,
+# because a fresh Linux checkout is already LF.
+#
+# Pinning eol=lf makes the working tree LF on every platform, matching both what
+# Git stores and what google-java-format expects. gitattributes takes precedence
+# over core.autocrlf, so no per-machine Git config is required.
+
+* text=auto eol=lf
+
+*.java       text eol=lf
+*.xml        text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf
+*.json       text eol=lf
+*.sql        text eol=lf
+*.md         text eol=lf
+*.properties text eol=lf
+Dockerfile   text eol=lf
+*.sh         text eol=lf
+mvnw         text eol=lf
+
+# Windows-only scripts must keep CRLF to remain executable by cmd.exe.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
