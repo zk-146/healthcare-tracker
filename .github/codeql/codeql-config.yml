@@ -1,0 +1,19 @@
+name: healthcare-tracker
+
+# Applies to every language in the CodeQL matrix in ci.yml.
+
+paths-ignore:
+  - ui/node_modules
+  - ui/dist
+  - target
+
+query-filters:
+  # java/spring-disabled-csrf-protection fires on SecurityConfig's
+  # `.csrf(AbstractHttpConfigurer::disable)`. It is a false positive here: the query flags the
+  # call unconditionally without reasoning about the auth scheme, and this API authenticates
+  # with `Authorization: Bearer` tokens under SessionCreationPolicy.STATELESS. CSRF requires the
+  # browser to attach credentials automatically, which only happens with cookies; nothing is
+  # stored in one (see ui/src/auth/tokenStorage.ts). Revisit this exclusion if the API ever
+  # adopts cookie-based auth, because then the alert becomes real.
+  - exclude:
+      id: java/spring-disabled-csrf-protection

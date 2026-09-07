@@ -92,11 +92,20 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # Required to publish results to the Security tab.
+      security-events: write
+
+    strategy:
+      # One language failing should not hide the other language's results.
+      fail-fast: false
+      matrix:
+        language: [java, javascript-typescript]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
+        if: matrix.language == 'java'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -106,22 +115,26 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: java
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
 
       - name: Build for CodeQL
+        if: matrix.language == 'java'
         run: mvn compile -B
 
+      # Results are uploaded to code scanning rather than written only to an artifact.
+      # With `upload: never` a finding of any severity still produced a green check, so the
+      # job could not surface anything it found.
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           output: codeql-results
-          upload: never
 
       - name: Upload CodeQL SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: codeql-results
+          name: codeql-results-${{ matrix.language }}
           path: codeql-results/*.sarif
 
   docker:
