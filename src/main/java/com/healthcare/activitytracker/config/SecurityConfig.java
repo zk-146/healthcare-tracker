@@ -34,6 +34,7 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
         // CSRF is disabled because this API uses stateless JWT Bearer tokens (no cookies).
+        // CodeQL flags this anyway; see .github/codeql/codeql-config.yml for the exclusion.
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
