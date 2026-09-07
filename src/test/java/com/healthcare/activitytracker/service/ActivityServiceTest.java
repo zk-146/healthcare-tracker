@@ -45,7 +45,11 @@ class ActivityServiceTest {
   void setUp() throws Exception {
     activityService =
         new ActivityService(
-            activityRepository, userRepository, activityEventPublisher, activityTypeMapper);
+            activityRepository,
+            userRepository,
+            activityEventPublisher,
+            activityTypeMapper,
+            new CalorieEstimator());
     // Inject maxPageSize (normally set by @Value) so PageRequest.of() doesn't get size 0
     java.lang.reflect.Field f = ActivityService.class.getDeclaredField("maxPageSize");
     f.setAccessible(true);
@@ -172,6 +176,56 @@ class ActivityServiceTest {
     assertThat(saved.getDeviceId()).isEqualTo("fitbit-charge-6");
     assertThat(saved.getExternalId()).isEqualTo("rec-1");
     verify(activityEventPublisher).publishActivityCreated(any());
+  }
+
+  @Test
+  void createActivity_estimatesCalories_whenClientOmitsThem() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
+    when(activityRepository.saveAndFlush(any(Activity.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    ActivityRequest req = testRequest();
+    req.setDurationMinutes(30); // RUNNING (MET 9.8), default 70 kg → 360.2 kcal
+
+    ActivityResponse response = activityService.createActivity(userId, req);
+    assertThat(response.getCaloriesBurned()).isEqualTo(360.2);
+  }
+
+  @Test
+  void createActivity_keepsClientCalories_whenProvided() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
+    when(activityRepository.saveAndFlush(any(Activity.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    ActivityRequest req = testRequest();
+    req.setDurationMinutes(30);
+    req.setCaloriesBurned(500.0);
+
+    ActivityResponse response = activityService.createActivity(userId, req);
+    assertThat(response.getCaloriesBurned()).isEqualTo(500.0);
+  }
+
+  @Test
+  void createActivity_leavesCaloriesNull_whenNotEstimable() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
+    when(activityRepository.saveAndFlush(any(Activity.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    ActivityResponse response = activityService.createActivity(userId, testRequest());
+    assertThat(response.getCaloriesBurned()).isNull();
+  }
+
+  @Test
+  void updateActivity_estimatesCalories_whenClientOmitsThem() {
+    when(activityRepository.findByIdAndUserId(activityId, userId))
+        .thenReturn(Optional.of(testActivity()));
+    when(activityRepository.save(any(Activity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    ActivityRequest req = testRequest();
+    req.setDurationMinutes(30);
+
+    ActivityResponse response = activityService.updateActivity(userId, activityId, req);
+    assertThat(response.getCaloriesBurned()).isEqualTo(360.2);
   }
 
   @Test

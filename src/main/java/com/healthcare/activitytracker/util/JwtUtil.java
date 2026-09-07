@@ -49,6 +49,10 @@ public class JwtUtil {
   private String buildToken(UUID userId, String email, String type, long expiryMs, SecretKey key) {
     Date now = new Date();
     return Jwts.builder()
+        // Unique per token. Without it, two tokens issued for the same user within the
+        // same second are byte-identical (iat/exp are second-precision), so their SHA-256
+        // hashes collide on the refresh_tokens.token_hash unique constraint.
+        .id(UUID.randomUUID().toString())
         .subject(userId.toString())
         .claim("email", email)
         .claim("type", type)

@@ -34,6 +34,7 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
         // CSRF is disabled because this API uses stateless JWT Bearer tokens (no cookies).
+        // CodeQL flags this anyway; see .github/codeql/codeql-config.yml for the exclusion.
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -49,7 +50,10 @@ public class SecurityConfig {
                           org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
                               .ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
               headers.contentSecurityPolicy(
-                  csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"));
+                  csp ->
+                      csp.policyDirectives(
+                          "default-src 'self'; img-src 'self' data:; connect-src 'self'; "
+                              + "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"));
               headers.permissionsPolicy(
                   permissions -> permissions.policy("geolocation=(), camera=(), microphone=()"));
             })
@@ -64,6 +68,10 @@ public class SecurityConfig {
                     // OAuth redirect target: Google sends the browser here with no JWT, so it
                     // cannot require authentication. It is secured instead by the one-time state.
                     .requestMatchers("/api/v1/integrations/google-health/callback")
+                    .permitAll()
+                    // SPA shell and hashed build assets. Authentication is enforced per-request by
+                    // JwtAuthenticationFilter on /api/**, not by withholding the HTML.
+                    .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**")
                     .permitAll()
                     // API docs are public; springdoc is disabled in the prod profile,
                     // where these paths return 404

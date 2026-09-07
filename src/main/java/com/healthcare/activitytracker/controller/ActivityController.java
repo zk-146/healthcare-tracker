@@ -2,9 +2,11 @@ package com.healthcare.activitytracker.controller;
 
 import com.healthcare.activitytracker.model.dto.ActivityRequest;
 import com.healthcare.activitytracker.model.dto.ActivityResponse;
+import com.healthcare.activitytracker.model.dto.NotesInsightResponse;
 import com.healthcare.activitytracker.model.enums.ActivitySource;
 import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.service.ActivityService;
+import com.healthcare.activitytracker.service.NotesAnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,9 +27,12 @@ import org.springframework.web.bind.annotation.*;
 public class ActivityController {
 
   private final ActivityService activityService;
+  private final NotesAnalysisService notesAnalysisService;
 
-  public ActivityController(ActivityService activityService) {
+  public ActivityController(
+      ActivityService activityService, NotesAnalysisService notesAnalysisService) {
     this.activityService = activityService;
+    this.notesAnalysisService = notesAnalysisService;
   }
 
   /** Logs a new activity for the authenticated user. Returns 201 with the created resource. */
@@ -73,6 +78,19 @@ public class ActivityController {
       Authentication auth, @PathVariable UUID id, @Valid @RequestBody ActivityRequest request) {
     UUID userId = (UUID) auth.getPrincipal();
     return ResponseEntity.ok(activityService.updateActivity(userId, id, request));
+  }
+
+  /**
+   * Returns an AI analysis of this activity's notes (mood and pain mentions). When the local LLM is
+   * unavailable, responds with {@code available=false} instead of an error. 404 if the activity
+   * does not exist or belongs to another user.
+   */
+  @Operation(summary = "AI analysis of this activity's notes (mood / pain mentions)")
+  @GetMapping("/{id}/insights")
+  public ResponseEntity<NotesInsightResponse> getInsights(
+      Authentication auth, @PathVariable UUID id) {
+    UUID userId = (UUID) auth.getPrincipal();
+    return ResponseEntity.ok(notesAnalysisService.analyzeNotes(userId, id));
   }
 
   /** Permanently deletes an activity. Returns 204 on success, 404 if not found. */

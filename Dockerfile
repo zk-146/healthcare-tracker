@@ -1,9 +1,19 @@
-# Build stage
+# Frontend build stage
+FROM node:22-alpine AS ui
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui/ ./
+RUN npm run build
+
+# Backend build stage
 FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline -q
 COPY src ./src
+# The SPA is served from the same origin as the API; see the design spec for why.
+COPY --from=ui /ui/dist ./src/main/resources/static
 RUN mvn package -Dmaven.test.skip=true -q
 
 # Run stage
