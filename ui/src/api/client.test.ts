@@ -167,4 +167,43 @@ describe('createApiClient', () => {
     expect(store.current).toBeNull();
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
   });
+
+  it('sends a PUT with a JSON body and returns the parsed response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'a1' }));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    const result = await api.put('/api/v1/activities/a1', { durationMinutes: 30 });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/activities/a1');
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBe(JSON.stringify({ durationMinutes: 30 }));
+    expect((init.headers as Headers).get('Content-Type')).toBe('application/json');
+    expect(result).toEqual({ id: 'a1' });
+  });
+
+  it('sends a DELETE with no body and resolves to undefined on 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    const result = await api.del('/api/v1/activities/a1');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/activities/a1');
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
+    expect(result).toBeUndefined();
+  });
+
+  it('throws an ApiError carrying the parsed body when a PUT conflicts', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ status: 409, error: 'Activity was modified' }, 409));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    await expect(api.put('/api/v1/activities/a1', {})).rejects.toMatchObject({
+      status: 409,
+      body: { error: 'Activity was modified' },
+    });
+  });
 });
