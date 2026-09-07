@@ -74,6 +74,18 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # setup-java's maven cache only saves on a miss, and build/codeql share its key, so
+      # they win the race and this job's freshly downloaded NVD database was never persisted
+      # -- a full ~390k-CVE pull on every run. A dedicated cache keyed on run_id always
+      # misses (so it always saves) while restore-keys brings back the newest prior copy,
+      # leaving dependency-check an incremental delta to fetch.
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nvd-${{ runner.os }}-
+
       # Enforcing: fails the job on any dependency with CVSS >= 7
       # (failBuildOnCVSS=7 configured in pom.xml)
       - name: OWASP Dependency Check
