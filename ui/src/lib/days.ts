@@ -92,8 +92,14 @@ export function totals(buckets: DayBucket[]): WindowTotals {
   );
 }
 
-/** e.g. "Sat 22 Aug". */
-export function formatDayLabel(dayKey: string, locale?: string): string {
+/**
+ * e.g. "Sat 22 Aug".
+ *
+ * The locale is pinned rather than inherited from the host: left undefined,
+ * `toLocaleDateString` renders "22 Aug" on an en-GB machine and "Aug 22" on an
+ * en-US one, so the label differed per viewer and per CI runner.
+ */
+export function formatDayLabel(dayKey: string, locale = 'en-GB'): string {
   const [year, month, day] = dayKey.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(locale, {
     weekday: 'short',
