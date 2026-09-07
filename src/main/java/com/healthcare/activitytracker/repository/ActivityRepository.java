@@ -35,11 +35,10 @@ public interface ActivityRepository
   int deleteAllByUserId(@Param("userId") UUID userId);
 
   /**
-   * The CASTs are load-bearing on PostgreSQL. A parameter whose only appearance is
-   * {@code ? IS NULL} gives the planner nothing to infer a type from, and Postgres
-   * rejects the statement with "could not determine data type of parameter". The
-   * comparison arms need no cast — the column supplies the type there. H2 infers
-   * either way, so this only ever failed against real Postgres.
+   * The CASTs are load-bearing on PostgreSQL. A parameter whose only appearance is {@code ? IS
+   * NULL} gives the planner nothing to infer a type from, and Postgres rejects the statement with
+   * "could not determine data type of parameter". The comparison arms need no cast — the column
+   * supplies the type there. H2 infers either way, so this only ever failed against real Postgres.
    */
   @Query(
       "SELECT a FROM Activity a WHERE a.user.id = :userId "
