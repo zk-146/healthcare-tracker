@@ -1,11 +1,116 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
     <!--
-        Add suppressions here for false positives.
-        Example:
-        <suppress>
-            <notes>False positive: CVE-XXXX-XXXX does not apply because ...</notes>
-            <cve>CVE-XXXX-XXXX</cve>
-        </suppress>
+        Every entry below is a vulnerability with NO published fix for the version line
+        Spring Boot 3.5.x pins. Spring Framework 6.2.20 and Spring Security 6.5.12 are the
+        announced fix versions; neither exists on Maven Central (both 404 as of 2026-09-07),
+        so there is nothing to upgrade to. They are suppressed on the narrower ground that
+        this application does not use the vulnerable feature at all - each note records the
+        check that establishes it.
+
+        Every entry carries until="2026-12-31Z". When that passes the suppression lapses and
+        the build goes red again, forcing a re-check of whether the fix has shipped. Do not
+        extend a date without re-verifying the claim underneath it.
+
+        Not suppressed, deliberately: CVE-2026-65898 (DOMPurify bundled inside swagger-ui).
+        dependency-check scores it 5.1, below failBuildOnCVSS=7, so it stays visible in the
+        report without breaking the build. It clears when springdoc ships a swagger-ui with
+        DOMPurify >= 3.4.11.
     -->
+
+    <!-- ===== Spring Framework 6.2.19 (fix 6.2.20 unpublished) ===== -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            SSE stream corruption with view fragments. This application exposes no
+            Server-Sent Events endpoints: no SseEmitter, ServerSentEvent, or
+            text/event-stream producer anywhere in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-47890</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            WebFlux + Aalto XML maxInMemorySize bypass. Requires WebFlux and the Aalto XML
+            processor; this is a Spring MVC application (spring-boot-starter-web, no
+            spring-boot-starter-webflux) and Aalto is not on the dependency tree.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-47891</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Pre-flight header predicate bypass in WebFlux functional endpoints deployed on
+            DispatcherServlet. No WebFlux on the classpath and no functional endpoints:
+            zero RouterFunction/RouterFunctions usages. Routing is annotated controllers only.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-47892</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Request headers exposed in a WebFlux WebSocket error path. No WebFlux and no
+            WebSocket support is configured in this application.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-47893</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            User-supplied property paths through Spring's data binding infrastructure. This
+            application does not use that infrastructure: zero occurrences of @ModelAttribute,
+            @InitBinder, DataBinder, WebDataBinder or BeanWrapper in src/main. Request payloads
+            arrive via @RequestBody (Jackson deserialisation) and @RequestParam/@PathVariable
+            simple type conversion, none of which walk property paths.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-59282</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            SpEL safety guard bypass via SimpleEvaluationContext. This application evaluates no
+            SpEL expressions: no SimpleEvaluationContext, ExpressionParser or SpelExpression
+            usage in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-59283</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            SSE stream corruption via the functional web framework. Requires RouterFunction
+            based routing and SSE; this application has neither.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-59313</cve>
+    </suppress>
+
+    <!-- ===== Spring Security 6.5.11 (fix 6.5.12 unpublished) ===== -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            WebAuthn user-verification bypass with a distributed HTTP session store. This
+            application does not use WebAuthn or passkeys, and is stateless
+            (SessionCreationPolicy.STATELESS) with JWT Bearer authentication -- there is no
+            HTTP session store at all.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-47841</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Spring Security's embedded UnboundID LDAP server registers an administrative
+            credential and binds its listener broadly. This application uses no LDAP: no
+            UnboundIdContainer, no spring-security-ldap dependency, and authentication is
+            database-backed with JWT.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(core|web)@.*$</packageUrl>
+        <cve>CVE-2026-59270</cve>
+    </suppress>
 </suppressions>
