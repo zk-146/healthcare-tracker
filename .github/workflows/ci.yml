@@ -79,8 +79,8 @@ jobs:
       # -- a full ~390k-CVE pull on every run. A dedicated cache keyed on run_id always
       # misses (so it always saves) while restore-keys brings back the newest prior copy,
       # leaving dependency-check an incremental delta to fetch.
-      - name: Cache NVD database
-        uses: actions/cache@v4
+      - name: Restore NVD database
+        uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: nvd-${{ runner.os }}-${{ github.run_id }}
@@ -90,6 +90,17 @@ jobs:
       # (failBuildOnCVSS=7 configured in pom.xml)
       - name: OWASP Dependency Check
         run: mvn dependency-check:check -B -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+
+      # Split from the restore deliberately. actions/cache skips its save step when the job
+      # has failed, and this job fails by design whenever a CVE breaches the threshold -- so
+      # a combined cache action would never persist the database on exactly the runs that
+      # are red, leaving every one of them to re-download all ~390k CVEs.
+      - name: Save NVD database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload OWASP report
         if: always()
