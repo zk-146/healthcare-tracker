@@ -12,6 +12,13 @@
         the build goes red again, forcing a re-check of whether the fix has shipped. Do not
         extend a date without re-verifying the claim underneath it.
 
+        Scope note: these CVEs are properties of Spring Framework and Spring Security as a
+        whole, and dependency-check attaches the vendor CPE to every jar in the release train -
+        spring-core, spring-web, spring-webmvc, spring-tx, spring-security-config and so on.
+        Naming individual artifacts meant the same CVE kept firing from whichever jar was not
+        on the list, so the packageUrl patterns cover the whole group. They stay scoped to the
+        two groupIds: an identical CVE id against any other dependency is still reported.
+
         Not suppressed, deliberately: CVE-2026-65898 (DOMPurify bundled inside swagger-ui).
         dependency-check scores it 5.1, below failBuildOnCVSS=7, so it stays visible in the
         report without breaking the build. It clears when springdoc ships a swagger-ui with
@@ -26,7 +33,7 @@
             Server-Sent Events endpoints: no SseEmitter, ServerSentEvent, or
             text/event-stream producer anywhere in src/main.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-47890</cve>
     </suppress>
 
@@ -36,7 +43,7 @@
             processor; this is a Spring MVC application (spring-boot-starter-web, no
             spring-boot-starter-webflux) and Aalto is not on the dependency tree.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-47891</cve>
     </suppress>
 
@@ -46,7 +53,7 @@
             DispatcherServlet. No WebFlux on the classpath and no functional endpoints:
             zero RouterFunction/RouterFunctions usages. Routing is annotated controllers only.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-47892</cve>
     </suppress>
 
@@ -55,7 +62,7 @@
             Request headers exposed in a WebFlux WebSocket error path. No WebFlux and no
             WebSocket support is configured in this application.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-47893</cve>
     </suppress>
 
@@ -67,7 +74,7 @@
             arrive via @RequestBody (Jackson deserialisation) and @RequestParam/@PathVariable
             simple type conversion, none of which walk property paths.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-59282</cve>
     </suppress>
 
@@ -77,7 +84,7 @@
             SpEL expressions: no SimpleEvaluationContext, ExpressionParser or SpelExpression
             usage in src/main.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-59283</cve>
     </suppress>
 
@@ -86,7 +93,7 @@
             SSE stream corruption via the functional web framework. Requires RouterFunction
             based routing and SSE; this application has neither.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
         <cve>CVE-2026-59313</cve>
     </suppress>
 
@@ -99,7 +106,7 @@
             (SessionCreationPolicy.STATELESS) with JWT Bearer authentication -- there is no
             HTTP session store at all.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-47841</cve>
     </suppress>
 
@@ -110,7 +117,7 @@
             UnboundIdContainer, no spring-security-ldap dependency, and authentication is
             database-backed with JWT.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-(core|web)@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-59270</cve>
     </suppress>
 </suppressions>
