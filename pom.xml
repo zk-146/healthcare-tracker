@@ -274,6 +274,13 @@
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                     <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
+                    <!-- Sonatype OSS Index rejects anonymous requests with 401, which
+                         dependency-check raises as a fatal AnalysisException. It has never
+                         returned data in this pipeline - earlier runs logged the same failure
+                         as warnings, masked by the CVSS gate failing first - so disabling it
+                         costs no coverage we actually had. NVD remains the data source.
+                         Re-enable with ossIndexServerId credentials if that account is set up. -->
+                    <ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
                 </configuration>
             </plugin>
         </plugins>
