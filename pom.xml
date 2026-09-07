@@ -84,6 +84,13 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
+        <!-- Flyway 10 split per-database support out of flyway-core. Without this module
+             Flyway aborts with "Unsupported Database: PostgreSQL 16.x" at startup. Version
+             is managed by the Spring Boot BOM. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
 
         <!-- Actuator -->
         <dependency>
