@@ -1,5 +1,6 @@
 import { ApiError, type ApiClient } from './client';
 import type {
+  ActivityInput,
   ActivityResponse,
   AuthResponse,
   GoogleHealthStatusResponse,
@@ -60,4 +61,58 @@ export async function login(
 /** Blacklists the access token server-side rather than merely discarding it. */
 export async function logout(api: ApiClient): Promise<void> {
   await api.post<void>('/api/v1/auth/logout');
+}
+
+const OPTIONAL_FIELDS = [
+  'distanceKm',
+  'caloriesBurned',
+  'steps',
+  'heartRateAvg',
+  'notes',
+] as const;
+
+/** Global constraint: source is hard-coded MANUAL and endedAt is never sent. */
+function activityBody(input: ActivityInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    activityType: input.activityType,
+    source: 'MANUAL',
+    startedAt: input.startedAt,
+    durationMinutes: input.durationMinutes,
+  };
+  for (const field of OPTIONAL_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      body[field] = value;
+    }
+  }
+  return body;
+}
+
+export function createActivity(api: ApiClient, input: ActivityInput): Promise<ActivityResponse> {
+  return api.post<ActivityResponse>('/api/v1/activities', activityBody(input));
+}
+
+export function updateActivity(
+  api: ApiClient,
+  id: string,
+  input: ActivityInput,
+): Promise<ActivityResponse> {
+  return api.put<ActivityResponse>(`/api/v1/activities/${id}`, activityBody(input));
+}
+
+export function deleteActivity(api: ApiClient, id: string): Promise<void> {
+  return api.del<void>(`/api/v1/activities/${id}`);
+}
+
+/**
+ * Full history, newest first — unlike listActivities, which windows by date for the
+ * dashboard. Page size 20 keeps the first paint small on a phone.
+ */
+export function listAllActivities(api: ApiClient, page: number): Promise<Page<ActivityResponse>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: '20',
+    sort: 'startedAt,desc',
+  });
+  return api.get<Page<ActivityResponse>>(`/api/v1/activities?${params.toString()}`);
 }
