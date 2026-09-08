@@ -28,10 +28,26 @@ project — do not mistake them for results.
 
 If you have a key, `NVD_API_KEY=... ./scripts/local-ci/owasp-scan.sh` uses it.
 
-## The build and frontend jobs
+## The build job
 
 ```bash
-act -j build
+./scripts/local-ci/build.sh
+```
+
+Runs `mvn -B verify` — compile plus the full test suite — in a Maven container,
+exactly as the `build` job does. Maven artifacts are cached in the `atracker-m2`
+Docker volume (shared with `owasp-scan.sh`), so only the first run pays the
+download cost; a warm run is about 3 minutes.
+
+This job is a direct container run rather than `act -j build` on purpose: `act`'s
+runner image (`catthehacker/ubuntu:act-latest`) has no Maven and no JDK, GitHub's
+hosted runners preinstall Maven, `setup-java` only installs a JDK, and this repo
+has no `./mvnw` wrapper — so under `act` the job dies with `mvn: command not
+found`. Do not re-attempt it through `act`.
+
+## The frontend job
+
+```bash
 act -j frontend
 ```
 
@@ -39,8 +55,8 @@ Requires [`act`](https://github.com/nektos/act). Config is in `.actrc`; secrets
 come from `.secrets`, which is gitignored — copy the `NVD_API_KEY=` placeholder
 line into a fresh one if you do not have the file.
 
-`act` logs a cache miss for `setup-java` and `setup-node` on every run because it
-does not implement `actions/cache`. That is expected.
+`act` logs a cache miss for `setup-node` on every run because it does not
+implement `actions/cache`. That is expected.
 
 ## Jobs not mirrored here
 
@@ -51,9 +67,11 @@ does not implement `actions/cache`. That is expected.
 ## Resetting the caches
 
 ```bash
-docker volume rm atracker-m2    # Maven artifacts; cheap to rebuild
+docker volume rm atracker-m2    # Maven artifacts, shared by build.sh and owasp-scan.sh; cheap to rebuild
 docker volume rm atracker-nvd   # NVD database; costs another 30-90 min sync
 ```
 
-`atracker-nvd` is mounted inside `atracker-m2`, so removing the Maven volume
-alone leaves the expensive NVD database intact.
+`atracker-nvd` is mounted inside `atracker-m2` by `owasp-scan.sh`, so removing
+the Maven volume alone leaves the expensive NVD database intact. Removing
+`atracker-m2` only forces `build.sh` and `owasp-scan.sh` to re-download Maven
+artifacts.
