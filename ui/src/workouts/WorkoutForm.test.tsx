@@ -131,6 +131,45 @@ describe('WorkoutForm — create mode', () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('routes an unmatched 400 detail key to the banner, not a field error', async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      post: vi.fn().mockRejectedValue(
+        new ApiError(400, {
+          error: 'Validation failed',
+          details: { someClassLevelRule: 'Start and end times are inconsistent' },
+        }),
+      ),
+    });
+    render(<WorkoutForm api={api} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    await user.type(screen.getByLabelText('Duration (minutes)'), '30');
+    await user.click(screen.getByRole('button', { name: 'Save workout' }));
+
+    expect(
+      await screen.findByText('Start and end times are inconsistent'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.field-error')).not.toBeInTheDocument();
+  });
+
+  it('cycles Tab and Shift+Tab focus within the dialog without escaping it', async () => {
+    const user = userEvent.setup();
+    render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    const dialog = screen.getByRole('dialog');
+    const focusable = dialog.querySelectorAll('select, input, textarea, button');
+    const first = focusable[0] as HTMLElement;
+    const last = focusable[focusable.length - 1] as HTMLElement;
+
+    first.focus();
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(last);
+
+    last.focus();
+    await user.tab();
+    expect(document.activeElement).toBe(first);
+  });
 });
 
 describe('WorkoutForm — edit mode', () => {
