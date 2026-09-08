@@ -14,10 +14,17 @@ Runs `mvn dependency-check:check` in a Maven container with the pom's
 breach, exactly as the `owasp` job does. This is the one to use when tuning
 suppressions.
 
-**The first run takes 30-90 minutes.** There is no NVD API key configured, so
-the initial sync of the ~400k-CVE database is rate-limited. It is cached in the
-`atracker-nvd` Docker volume afterwards; subsequent runs take about 1-4
-minutes.
+**The first run is a full NVD sync and is slow.** There is no NVD API key
+configured, so the initial download of the ~400k-CVE database is rate-limited: it
+took 43 minutes when measured; budget 30-90, since it varies with NVD rate
+limiting. The database is cached in the `atracker-nvd` Docker volume afterwards,
+and warm subsequent runs take about 22 seconds.
+
+During the first sync you will see a couple of
+`[ERROR] Failed to process CVE-...` lines. These are dependency-check ingest
+errors on unrelated (Mozilla) CVEs whose reference URL is too long for its
+database column. They do not fail the run and are not findings against this
+project — do not mistake them for results.
 
 If you have a key, `NVD_API_KEY=... ./scripts/local-ci/owasp-scan.sh` uses it.
 
