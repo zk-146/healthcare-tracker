@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, type ApiClient } from '../api/client';
 import { createActivity, deleteActivity, updateActivity } from '../api/endpoints';
 import type { ActivityResponse, ActivityType } from '../api/types';
@@ -29,7 +29,7 @@ const CONFLICT_MESSAGE =
 
 const NOTES_LIMIT = 1000;
 
-const DRAFT_KEYS: readonly string[] = [
+const DRAFT_KEYS: readonly (keyof WorkoutDraft)[] = [
   'activityType',
   'startedAt',
   'durationMinutes',
@@ -51,7 +51,7 @@ function splitDetails(details: Record<string, string>): { errors: FieldErrors; b
   const errors: FieldErrors = {};
   const unmatched: string[] = [];
   for (const [field, message] of Object.entries(details)) {
-    if (DRAFT_KEYS.includes(field)) {
+    if ((DRAFT_KEYS as readonly string[]).includes(field)) {
       errors[field as keyof WorkoutDraft] = message;
     } else {
       unmatched.push(message);
@@ -75,7 +75,7 @@ function Field({ id, label, error, children }: FieldProps) {
       </label>
       {children}
       {error !== undefined && (
-        <span className="field-error" role="alert">
+        <span id={`${id}-error`} className="field-error" role="alert">
           {error}
         </span>
       )}
@@ -101,44 +101,54 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [showDetails, setShowDetails] = useState(
-    () => initial !== undefined && hasDetails(draftFrom(initial)),
-  );
+  const [showDetails, setShowDetails] = useState(() => hasDetails(draft));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
   }, []);
 
+  /**
+   * Esc closes; Tab wraps, so focus never escapes the overlay to the page behind it.
+   * Registered on document (not the overlay div's onKeyDown) because a click on the
+   * backdrop, the title, or the delete-confirm text moves document.activeElement to
+   * <body>, and from there a JSX onKeyDown that relies on bubbling never fires again.
+   */
+  useEffect(() => {
+    function handleKeyDown(event: globalThis.KeyboardEvent): void {
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || dialogRef.current === null) {
+        return;
+      }
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (element) => !element.hasAttribute('disabled'),
+      );
+      if (focusable.length === 0) {
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   function set<K extends keyof WorkoutDraft>(key: K, value: WorkoutDraft[K]): void {
     setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  /** Esc closes; Tab wraps, so focus never escapes the overlay to the page behind it. */
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (event.key === 'Escape') {
-      onClose();
-      return;
-    }
-    if (event.key !== 'Tab' || dialogRef.current === null) {
-      return;
-    }
-    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-      (element) => !element.hasAttribute('disabled'),
-    );
-    if (focusable.length === 0) {
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    } else if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    }
   }
 
   function handleFailure(cause: unknown): void {
@@ -175,7 +185,6 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
       onClose();
     } catch (cause: unknown) {
       handleFailure(cause);
-    } finally {
       setBusy(false);
     }
   }
@@ -193,7 +202,6 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
     } catch (cause: unknown) {
       setBanner(messageFor(cause));
       setConfirmingDelete(false);
-    } finally {
       setBusy(false);
     }
   }
@@ -201,12 +209,12 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
   const title = initial === undefined ? 'Log workout' : 'Edit workout';
 
   return (
-    <div className="overlay" onKeyDown={handleKeyDown}>
+    <div className="overlay">
       <div className="overlay-panel" role="dialog" aria-modal="true" aria-label={title} ref={dialogRef}>
         <form onSubmit={(event) => void handleSubmit(event)} noValidate>
           <header className="overlay-header">
             <h2 className="overlay-title">{title}</h2>
-            <button type="button" className="link-button" onClick={onClose}>
+            <button type="button" className="link-button" onClick={onClose} disabled={busy}>
               Close
             </button>
           </header>
@@ -218,6 +226,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
               id="activityType"
               value={draft.activityType}
               onChange={(event) => set('activityType', event.target.value as ActivityType)}
+              aria-invalid={errors.activityType !== undefined}
+              aria-describedby={errors.activityType !== undefined ? 'activityType-error' : undefined}
             >
               {(Object.keys(TYPE_LABELS) as ActivityType[]).map((type) => (
                 <option key={type} value={type}>
@@ -233,6 +243,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
               type="datetime-local"
               value={draft.startedAt}
               onChange={(event) => set('startedAt', event.target.value)}
+              aria-invalid={errors.startedAt !== undefined}
+              aria-describedby={errors.startedAt !== undefined ? 'startedAt-error' : undefined}
             />
           </Field>
 
@@ -243,6 +255,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
               inputMode="numeric"
               value={draft.durationMinutes}
               onChange={(event) => set('durationMinutes', event.target.value)}
+              aria-invalid={errors.durationMinutes !== undefined}
+              aria-describedby={errors.durationMinutes !== undefined ? 'durationMinutes-error' : undefined}
             />
           </Field>
 
@@ -261,6 +275,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   step="0.01"
                   value={draft.distanceKm}
                   onChange={(event) => set('distanceKm', event.target.value)}
+                  aria-invalid={errors.distanceKm !== undefined}
+                  aria-describedby={errors.distanceKm !== undefined ? 'distanceKm-error' : undefined}
                 />
               </Field>
 
@@ -270,6 +286,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   type="number"
                   value={draft.caloriesBurned}
                   onChange={(event) => set('caloriesBurned', event.target.value)}
+                  aria-invalid={errors.caloriesBurned !== undefined}
+                  aria-describedby={errors.caloriesBurned !== undefined ? 'caloriesBurned-error' : undefined}
                 />
               </Field>
 
@@ -279,6 +297,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   type="number"
                   value={draft.steps}
                   onChange={(event) => set('steps', event.target.value)}
+                  aria-invalid={errors.steps !== undefined}
+                  aria-describedby={errors.steps !== undefined ? 'steps-error' : undefined}
                 />
               </Field>
 
@@ -288,6 +308,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   type="number"
                   value={draft.heartRateAvg}
                   onChange={(event) => set('heartRateAvg', event.target.value)}
+                  aria-invalid={errors.heartRateAvg !== undefined}
+                  aria-describedby={errors.heartRateAvg !== undefined ? 'heartRateAvg-error' : undefined}
                 />
               </Field>
 
@@ -297,6 +319,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   rows={3}
                   value={draft.notes}
                   onChange={(event) => set('notes', event.target.value)}
+                  aria-invalid={errors.notes !== undefined}
+                  aria-describedby={errors.notes !== undefined ? 'notes-error' : undefined}
                 />
                 <span className="field-counter">
                   {draft.notes.length} / {NOTES_LIMIT}
@@ -330,7 +354,12 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
               >
                 Confirm
               </button>
-              <button type="button" className="link-button" onClick={() => setConfirmingDelete(false)}>
+              <button
+                type="button"
+                className="link-button"
+                disabled={busy}
+                onClick={() => setConfirmingDelete(false)}
+              >
                 Cancel
               </button>
             </div>
