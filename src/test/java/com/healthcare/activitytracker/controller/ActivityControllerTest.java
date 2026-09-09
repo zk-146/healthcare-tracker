@@ -2,6 +2,7 @@ package com.healthcare.activitytracker.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -22,6 +23,7 @@ import com.healthcare.activitytracker.service.NotesAnalysisService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
@@ -66,16 +68,22 @@ class ActivityControllerTest {
         .id(UUID.randomUUID())
         .activityType(ActivityType.RUNNING)
         .source(ActivitySource.MANUAL)
-        .startedAt(LocalDateTime.now().minusHours(1))
-        .createdAt(LocalDateTime.now())
+        .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1))
+        .createdAt(LocalDateTime.now(ZoneOffset.UTC))
         .build();
   }
 
+  /**
+   * Built against a fixed clock (UTC) rather than the JVM default zone: activityService is mocked
+   * in this class, so nothing here currently reaches the real future-date check, but a request
+   * built from LocalDateTime.now() with no explicit zone would silently start failing that check on
+   * a machine east of UTC the day it does.
+   */
   private ActivityRequest validRequest() {
     ActivityRequest req = new ActivityRequest();
     req.setActivityType(ActivityType.RUNNING);
     req.setSource(ActivitySource.MANUAL);
-    req.setStartedAt(LocalDateTime.now().minusHours(1));
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
     return req;
   }
 
@@ -95,8 +103,11 @@ class ActivityControllerTest {
 
   @Test
   void createActivity_passesResolvedZone_fromTimezoneHeader() throws Exception {
-    when(activityService.createActivity(any(), any(), eq(ZoneOffset.of("+05:30"))))
-        .thenReturn(mockResponse());
+    // A stub matched on the expected zone would silently return null (Mockito's default for an
+    // unmatched call on a @MockBean, since strict stubbing isn't on) and the assertion below
+    // would still pass on a 201 with a null body -- so this stubs loosely and verifies the exact
+    // zone actually received instead, which fails loudly if the wrong one (or none) arrives.
+    when(activityService.createActivity(any(), any(), any())).thenReturn(mockResponse());
 
     mockMvc
         .perform(
@@ -107,12 +118,13 @@ class ActivityControllerTest {
                 .content(objectMapper.writeValueAsString(validRequest()))
                 .header("X-User-Timezone", "Asia/Kolkata"))
         .andExpect(status().isCreated());
+
+    verify(activityService).createActivity(any(), any(), eq(ZoneId.of("Asia/Kolkata")));
   }
 
   @Test
   void createActivity_defaultsToUtc_whenTimezoneHeaderAbsent() throws Exception {
-    when(activityService.createActivity(any(), any(), eq(ZoneOffset.UTC)))
-        .thenReturn(mockResponse());
+    when(activityService.createActivity(any(), any(), any())).thenReturn(mockResponse());
 
     mockMvc
         .perform(
@@ -122,6 +134,8 @@ class ActivityControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
         .andExpect(status().isCreated());
+
+    verify(activityService).createActivity(any(), any(), eq(ZoneOffset.UTC));
   }
 
   /**

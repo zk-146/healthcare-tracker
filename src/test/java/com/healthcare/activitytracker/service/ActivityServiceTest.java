@@ -74,15 +74,21 @@ class ActivityServiceTest {
         .user(testUser())
         .activityType(ActivityType.RUNNING)
         .source(ActivitySource.MANUAL)
-        .startedAt(LocalDateTime.now().minusHours(1))
+        .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1))
         .build();
   }
 
+  /**
+   * Built against a fixed clock (UTC), not the JVM default zone: every call site below passes
+   * ZoneOffset.UTC as the validation zone, so a startedAt built from LocalDateTime.now() with no
+   * explicit zone would fail validateNotFuture on any machine east of UTC -- exactly the class of
+   * bug this fix exists to close.
+   */
   private ActivityRequest testRequest() {
     ActivityRequest req = new ActivityRequest();
     req.setActivityType(ActivityType.RUNNING);
     req.setSource(ActivitySource.MANUAL);
-    req.setStartedAt(LocalDateTime.now().minusHours(1));
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
     return req;
   }
 
