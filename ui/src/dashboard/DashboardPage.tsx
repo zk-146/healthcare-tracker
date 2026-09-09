@@ -92,7 +92,7 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
     activities.state === 'ready' && activities.value.length > 0
       ? activities.value
           .map((activity) => dayKeyOf(activity.startedAt))
-          .sort()
+          .sort((a, b) => a.localeCompare(b))
           .at(-1) ?? null
       : null;
 
