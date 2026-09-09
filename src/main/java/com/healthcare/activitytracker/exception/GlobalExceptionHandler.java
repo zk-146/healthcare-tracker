@@ -62,6 +62,22 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
   }
 
+  /**
+   * Same response shape as {@link #handleValidation}, for a single-field rule enforced outside Bean
+   * Validation (e.g. one that needs the caller's timezone, which a {@code ConstraintValidator}
+   * cannot see).
+   */
+  @ExceptionHandler(FieldValidationException.class)
+  public ResponseEntity<Map<String, Object>> handleFieldValidation(FieldValidationException ex) {
+    log.warn("Validation failed for field '{}': {}", ex.getField(), ex.getMessage());
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("error", "Validation failed");
+    body.put("details", Map.of(ex.getField(), ex.getMessage()));
+    body.put("timestamp", Instant.now().toString());
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+  }
+
   @ExceptionHandler(CsvImportException.class)
   public ResponseEntity<Map<String, Object>> handleCsvImport(CsvImportException ex) {
     log.warn("CSV import rejected: {}", ex.getMessage());

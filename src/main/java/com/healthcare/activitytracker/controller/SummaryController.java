@@ -4,14 +4,12 @@ import com.healthcare.activitytracker.model.dto.DigestResponse;
 import com.healthcare.activitytracker.model.dto.SummaryResponse;
 import com.healthcare.activitytracker.service.ActivityDigestService;
 import com.healthcare.activitytracker.service.SummaryService;
+import com.healthcare.activitytracker.util.TimezoneResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -21,8 +19,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/summary")
 public class SummaryController {
-
-  private static final Logger log = LoggerFactory.getLogger(SummaryController.class);
 
   private final SummaryService summaryService;
   private final ActivityDigestService activityDigestService;
@@ -46,7 +42,7 @@ public class SummaryController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    ZoneId zone = resolveZone(timezone);
+    ZoneId zone = TimezoneResolver.resolveZone(timezone);
     return ResponseEntity.ok(summaryService.getSummary(userId, from, to, zone));
   }
 
@@ -57,7 +53,8 @@ public class SummaryController {
       Authentication auth,
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    return ResponseEntity.ok(summaryService.getDailySummary(userId, resolveZone(timezone)));
+    return ResponseEntity.ok(
+        summaryService.getDailySummary(userId, TimezoneResolver.resolveZone(timezone)));
   }
 
   /**
@@ -69,7 +66,8 @@ public class SummaryController {
       Authentication auth,
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    return ResponseEntity.ok(summaryService.getWeeklySummary(userId, resolveZone(timezone)));
+    return ResponseEntity.ok(
+        summaryService.getWeeklySummary(userId, TimezoneResolver.resolveZone(timezone)));
   }
 
   /** Returns a month-to-date activity summary (1st through today) in the user's local timezone. */
@@ -79,7 +77,8 @@ public class SummaryController {
       Authentication auth,
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    return ResponseEntity.ok(summaryService.getMonthlySummary(userId, resolveZone(timezone)));
+    return ResponseEntity.ok(
+        summaryService.getMonthlySummary(userId, TimezoneResolver.resolveZone(timezone)));
   }
 
   /**
@@ -95,22 +94,7 @@ public class SummaryController {
       @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
     return ResponseEntity.ok(
-        activityDigestService.generateDigest(userId, period, resolveZone(timezone)));
-  }
-
-  /**
-   * Parses the timezone string from the X-User-Timezone header. Falls back to UTC on null, blank,
-   * or unrecognized values.
-   */
-  private ZoneId resolveZone(String timezone) {
-    if (timezone == null || timezone.isBlank()) {
-      return ZoneOffset.UTC;
-    }
-    try {
-      return ZoneId.of(timezone);
-    } catch (java.time.DateTimeException e) {
-      log.warn("Unrecognized timezone '{}', defaulting to UTC", timezone);
-      return ZoneOffset.UTC;
-    }
+        activityDigestService.generateDigest(
+            userId, period, TimezoneResolver.resolveZone(timezone)));
   }
 }
