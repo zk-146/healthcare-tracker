@@ -34,6 +34,23 @@ const existing: ActivityResponse = {
   updatedAt: '2026-09-07T19:10:00',
 };
 
+const existingDevice: ActivityResponse = {
+  id: 'a2',
+  activityType: 'RUNNING',
+  source: 'IOT',
+  deviceId: 'watch-1',
+  startedAt: '2026-09-07T06:00:00',
+  endedAt: null,
+  durationMinutes: 30,
+  distanceKm: null,
+  caloriesBurned: null,
+  heartRateAvg: null,
+  steps: null,
+  notes: null,
+  createdAt: '2026-09-07T06:30:00',
+  updatedAt: '2026-09-07T06:30:00',
+};
+
 describe('WorkoutForm — create mode', () => {
   it('renders the create title and hides the optional fields', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
@@ -215,6 +232,26 @@ describe('WorkoutForm — edit mode', () => {
         startedAt: '2026-09-07T18:15:00',
         durationMinutes: 50,
         distanceKm: 18.4,
+      }),
+    );
+  });
+
+  it('carries source and deviceId through on an update to a device-sourced activity', async () => {
+    const user = userEvent.setup();
+    const api = fakeApi();
+    render(
+      <WorkoutForm api={api} initial={existingDevice} onClose={vi.fn()} onSaved={vi.fn()} now={now} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save workout' }));
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/v1/activities/a2', {
+        activityType: 'RUNNING',
+        source: 'IOT',
+        startedAt: '2026-09-07T06:00:00',
+        durationMinutes: 30,
+        deviceId: 'watch-1',
       }),
     );
   });

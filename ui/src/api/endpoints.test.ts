@@ -6,7 +6,7 @@ import {
   listAllActivities,
   updateActivity,
 } from './endpoints';
-import type { ActivityInput } from './types';
+import type { ActivityInput, ActivityResponse } from './types';
 
 function spyClient(): ApiClient {
   return {
@@ -21,6 +21,23 @@ const minimal: ActivityInput = {
   activityType: 'RUNNING',
   startedAt: '2026-09-08T07:30:00',
   durationMinutes: 45,
+};
+
+const originalManual: ActivityResponse = {
+  id: 'a1',
+  activityType: 'RUNNING',
+  source: 'MANUAL',
+  deviceId: null,
+  startedAt: '2026-09-08T07:30:00',
+  endedAt: null,
+  durationMinutes: 45,
+  distanceKm: null,
+  caloriesBurned: null,
+  heartRateAvg: null,
+  steps: null,
+  notes: null,
+  createdAt: '2026-09-08T07:00:00',
+  updatedAt: '2026-09-08T07:00:00',
 };
 
 describe('activity write endpoints', () => {
@@ -55,7 +72,7 @@ describe('activity write endpoints', () => {
   it('puts an update to the activity id, with the same body shape', async () => {
     const api = spyClient();
 
-    await updateActivity(api, 'a1', { ...minimal, steps: 9000 });
+    await updateActivity(api, 'a1', { ...minimal, steps: 9000 }, originalManual);
 
     expect(api.put).toHaveBeenCalledWith('/api/v1/activities/a1', {
       activityType: 'RUNNING',
@@ -64,6 +81,75 @@ describe('activity write endpoints', () => {
       durationMinutes: 45,
       steps: 9000,
     });
+  });
+
+  it('carries the original source and deviceId through on an update, not MANUAL', async () => {
+    const api = spyClient();
+    const original: ActivityResponse = {
+      ...originalManual,
+      source: 'CSV_IMPORT',
+      deviceId: 'device-123',
+    };
+
+    await updateActivity(api, 'a1', minimal, original);
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/activities/a1', {
+      activityType: 'RUNNING',
+      source: 'CSV_IMPORT',
+      startedAt: '2026-09-08T07:30:00',
+      durationMinutes: 45,
+      deviceId: 'device-123',
+    });
+  });
+
+  it('echoes the original endedAt when still consistent with the submitted times', async () => {
+    const api = spyClient();
+    const original: ActivityResponse = {
+      ...originalManual,
+      source: 'IOT',
+      deviceId: 'watch-1',
+      endedAt: '2026-09-08T08:15:00',
+    };
+
+    await updateActivity(api, 'a1', minimal, original);
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/activities/a1', {
+      activityType: 'RUNNING',
+      source: 'IOT',
+      startedAt: '2026-09-08T07:30:00',
+      durationMinutes: 45,
+      deviceId: 'watch-1',
+      endedAt: '2026-09-08T08:15:00',
+    });
+  });
+
+  it('omits endedAt when the edited duration no longer agrees with it', async () => {
+    const api = spyClient();
+    const original: ActivityResponse = {
+      ...originalManual,
+      source: 'IOT',
+      deviceId: 'watch-1',
+      endedAt: '2026-09-08T08:15:00',
+    };
+
+    await updateActivity(api, 'a1', { ...minimal, durationMinutes: 90 }, original);
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/activities/a1', {
+      activityType: 'RUNNING',
+      source: 'IOT',
+      startedAt: '2026-09-08T07:30:00',
+      durationMinutes: 90,
+      deviceId: 'watch-1',
+    });
+  });
+
+  it('omits deviceId when the original activity has none', async () => {
+    const api = spyClient();
+
+    await updateActivity(api, 'a1', minimal, originalManual);
+
+    const [, body] = (api.put as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body).not.toHaveProperty('deviceId');
   });
 
   it('deletes by id', async () => {
