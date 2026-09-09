@@ -7,10 +7,12 @@ import com.healthcare.activitytracker.model.enums.ActivitySource;
 import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.service.ActivityService;
 import com.healthcare.activitytracker.service.NotesAnalysisService;
+import com.healthcare.activitytracker.util.TimezoneResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,13 +37,21 @@ public class ActivityController {
     this.notesAnalysisService = notesAnalysisService;
   }
 
-  /** Logs a new activity for the authenticated user. Returns 201 with the created resource. */
+  /**
+   * Logs a new activity for the authenticated user. Returns 201 with the created resource. The
+   * optional {@code X-User-Timezone} header (e.g. {@code America/New_York}) is used to validate
+   * that startedAt/endedAt are not in the future for the caller; defaults to UTC if absent or
+   * unrecognized.
+   */
   @Operation(summary = "Log a new activity")
   @PostMapping
   public ResponseEntity<ActivityResponse> create(
-      Authentication auth, @Valid @RequestBody ActivityRequest request) {
+      Authentication auth,
+      @Valid @RequestBody ActivityRequest request,
+      @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    ActivityResponse response = activityService.createActivity(userId, request);
+    ZoneId zone = TimezoneResolver.resolveZone(timezone);
+    ActivityResponse response = activityService.createActivity(userId, request, zone);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
@@ -71,13 +81,20 @@ public class ActivityController {
     return ResponseEntity.ok(activityService.getActivity(userId, id));
   }
 
-  /** Replaces all fields of an existing activity. Returns 404 if not found. */
+  /**
+   * Replaces all fields of an existing activity. Returns 404 if not found. Same {@code
+   * X-User-Timezone} handling as {@link #create}.
+   */
   @Operation(summary = "Update an existing activity")
   @PutMapping("/{id}")
   public ResponseEntity<ActivityResponse> update(
-      Authentication auth, @PathVariable UUID id, @Valid @RequestBody ActivityRequest request) {
+      Authentication auth,
+      @PathVariable UUID id,
+      @Valid @RequestBody ActivityRequest request,
+      @RequestHeader(value = "X-User-Timezone", required = false) String timezone) {
     UUID userId = (UUID) auth.getPrincipal();
-    return ResponseEntity.ok(activityService.updateActivity(userId, id, request));
+    ZoneId zone = TimezoneResolver.resolveZone(timezone);
+    return ResponseEntity.ok(activityService.updateActivity(userId, id, request, zone));
   }
 
   /**

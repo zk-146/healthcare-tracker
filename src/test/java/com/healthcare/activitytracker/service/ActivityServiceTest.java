@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.healthcare.activitytracker.exception.FieldValidationException;
 import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ActivityRequest;
 import com.healthcare.activitytracker.model.dto.ActivityResponse;
@@ -15,6 +16,8 @@ import com.healthcare.activitytracker.model.enums.ActivityType;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,15 +74,21 @@ class ActivityServiceTest {
         .user(testUser())
         .activityType(ActivityType.RUNNING)
         .source(ActivitySource.MANUAL)
-        .startedAt(LocalDateTime.now().minusHours(1))
+        .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1))
         .build();
   }
 
+  /**
+   * Built against a fixed clock (UTC), not the JVM default zone: every call site below passes
+   * ZoneOffset.UTC as the validation zone, so a startedAt built from LocalDateTime.now() with no
+   * explicit zone would fail validateNotFuture on any machine east of UTC -- exactly the class of
+   * bug this fix exists to close.
+   */
   private ActivityRequest testRequest() {
     ActivityRequest req = new ActivityRequest();
     req.setActivityType(ActivityType.RUNNING);
     req.setSource(ActivitySource.MANUAL);
-    req.setStartedAt(LocalDateTime.now().minusHours(1));
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
     return req;
   }
 
@@ -101,7 +110,8 @@ class ActivityServiceTest {
               return a;
             });
 
-    ActivityResponse response = activityService.createActivity(userId, testRequest());
+    ActivityResponse response =
+        activityService.createActivity(userId, testRequest(), ZoneOffset.UTC);
     assertThat(response.getId()).isEqualTo(activityId);
     assertThat(response.getActivityType()).isEqualTo(ActivityType.RUNNING);
   }
@@ -109,8 +119,66 @@ class ActivityServiceTest {
   @Test
   void createActivity_throwsNotFound_whenUserMissing() {
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> activityService.createActivity(userId, testRequest()))
+    assertThatThrownBy(() -> activityService.createActivity(userId, testRequest(), ZoneOffset.UTC))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  /**
+   * The regression this fix targets: a caller 14 hours ahead of UTC (e.g. Pacific/Kiritimati)
+   * submits a time that is genuinely in their own past, but which still lands two hours ahead of
+   * the bare UTC clock a naive {@code @PastOrPresent} (or any check against the server's own
+   * default-zone clock) would have compared it to. Before this fix, this request was wrongly
+   * rejected as "in the future".
+   */
+  @Test
+  void createActivity_succeeds_whenStartedAtIsFutureUnderUtcButPastInCallerZone() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(testUser()));
+    when(activityRepository.saveAndFlush(any(Activity.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    ZoneId farAheadZone = ZoneOffset.ofHours(14);
+    ActivityRequest req = testRequest();
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(2));
+
+    ActivityResponse response = activityService.createActivity(userId, req, farAheadZone);
+    assertThat(response).isNotNull();
+  }
+
+  @Test
+  void createActivity_throwsFieldValidation_whenStartedAtIsFutureInCallerZone() {
+    ActivityRequest req = testRequest();
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+    assertThatThrownBy(() -> activityService.createActivity(userId, req, ZoneOffset.UTC))
+        .isInstanceOf(FieldValidationException.class)
+        .hasFieldOrPropertyWithValue("field", "startedAt")
+        .hasMessage("Start time cannot be in the future");
+    // Rejected before any persistence was attempted.
+    verifyNoInteractions(userRepository, activityRepository);
+  }
+
+  @Test
+  void createActivity_throwsFieldValidation_whenEndedAtIsFutureInCallerZone() {
+    ActivityRequest req = testRequest();
+    req.setEndedAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+    assertThatThrownBy(() -> activityService.createActivity(userId, req, ZoneOffset.UTC))
+        .isInstanceOf(FieldValidationException.class)
+        .hasFieldOrPropertyWithValue("field", "endedAt")
+        .hasMessage("End time cannot be in the future");
+  }
+
+  @Test
+  void updateActivity_throwsFieldValidation_whenStartedAtIsFutureInCallerZone() {
+    ActivityRequest req = testRequest();
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
+
+    assertThatThrownBy(
+            () -> activityService.updateActivity(userId, activityId, req, ZoneOffset.UTC))
+        .isInstanceOf(FieldValidationException.class)
+        .hasFieldOrPropertyWithValue("field", "startedAt");
+    // Rejected before the activity was even looked up.
+    verifyNoInteractions(activityRepository);
   }
 
   @Test
@@ -187,7 +255,7 @@ class ActivityServiceTest {
     ActivityRequest req = testRequest();
     req.setDurationMinutes(30); // RUNNING (MET 9.8), default 70 kg → 360.2 kcal
 
-    ActivityResponse response = activityService.createActivity(userId, req);
+    ActivityResponse response = activityService.createActivity(userId, req, ZoneOffset.UTC);
     assertThat(response.getCaloriesBurned()).isEqualTo(360.2);
   }
 
@@ -201,7 +269,7 @@ class ActivityServiceTest {
     req.setDurationMinutes(30);
     req.setCaloriesBurned(500.0);
 
-    ActivityResponse response = activityService.createActivity(userId, req);
+    ActivityResponse response = activityService.createActivity(userId, req, ZoneOffset.UTC);
     assertThat(response.getCaloriesBurned()).isEqualTo(500.0);
   }
 
@@ -211,7 +279,8 @@ class ActivityServiceTest {
     when(activityRepository.saveAndFlush(any(Activity.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
-    ActivityResponse response = activityService.createActivity(userId, testRequest());
+    ActivityResponse response =
+        activityService.createActivity(userId, testRequest(), ZoneOffset.UTC);
     assertThat(response.getCaloriesBurned()).isNull();
   }
 
@@ -224,7 +293,8 @@ class ActivityServiceTest {
     ActivityRequest req = testRequest();
     req.setDurationMinutes(30);
 
-    ActivityResponse response = activityService.updateActivity(userId, activityId, req);
+    ActivityResponse response =
+        activityService.updateActivity(userId, activityId, req, ZoneOffset.UTC);
     assertThat(response.getCaloriesBurned()).isEqualTo(360.2);
   }
 
