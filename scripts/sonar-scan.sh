@@ -87,9 +87,12 @@ docker run --rm \
   sonarsource/sonar-scanner-cli
 
 # The gate is reported, not enforced, so this never affects the exit code.
+# `|| true` guards the whole pipeline: under pipefail a curl/grep/head/cut
+# failure (network blip, gate not yet computed, auth hiccup) would otherwise
+# make this bare assignment fatal under set -e.
 GATE=$(curl -su "$SONAR_TOKEN:" \
   "$SONAR_URL/api/qualitygates/project_status?projectKey=healthcare-tracker" |
-  grep -o '"status":"[A-Z]*"' | head -1 | cut -d'"' -f4)
+  grep -o '"status":"[A-Z]*"' | head -1 | cut -d'"' -f4 || true)
 
 echo
 echo "Quality gate: ${GATE:-unknown}"
