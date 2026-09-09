@@ -106,7 +106,12 @@ public class GoogleHealthClient {
 
     Integer durationMinutes = null;
     if (endedAt != null) {
-      durationMinutes = (int) Duration.between(startedAt, endedAt).toMinutes();
+      // parseTime normalises both ends to UTC, so anchor them there for the duration.
+      durationMinutes =
+          (int)
+              Duration.between(
+                      startedAt.toInstant(ZoneOffset.UTC), endedAt.toInstant(ZoneOffset.UTC))
+                  .toMinutes();
     }
 
     return ImportedWorkout.builder()
