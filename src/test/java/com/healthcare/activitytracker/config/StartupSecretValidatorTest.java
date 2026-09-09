@@ -114,4 +114,27 @@ class StartupSecretValidatorTest {
                     googleHealth(true, GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY)))
         .doesNotThrowAnyException();
   }
+
+  @Test
+  void rejectsALongButDegenerateSecretInProd() {
+    // Long enough for hmacShaKeyFor, but a single repeated character.
+    String padding = "a".repeat(64);
+
+    assertThatThrownBy(
+            () -> run(padding, REFRESH_SECRET, googleHealth(false, "irrelevant"), "prod"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("distinct characters");
+  }
+
+  @Test
+  void acceptsAGeneratedLookingSecretInProd() {
+    assertThatCode(
+            () ->
+                run(
+                    "Xq7f2Kd9wPzR4tYbN1mHjL8sVcE6gA3u",
+                    "Zr5nT8vQ2yWkM4pJ7bXcD1hF9sG6aL0e",
+                    googleHealth(false, "irrelevant"),
+                    "prod"))
+        .doesNotThrowAnyException();
+  }
 }

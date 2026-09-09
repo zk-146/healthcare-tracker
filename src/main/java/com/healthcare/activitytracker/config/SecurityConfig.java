@@ -117,8 +117,16 @@ public class SecurityConfig {
     return source;
   }
 
+  /**
+   * Cost 12 rather than Spring's default of 10 — roughly four times the work per guess, which is
+   * the margin worth having on a store of health records.
+   *
+   * <p>Raising it is backward compatible: BCrypt encodes the cost it used inside the hash, so
+   * existing strength-10 hashes keep verifying and are re-hashed at the new cost the next time a
+   * password is set.
+   */
   @Bean
   public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+    return new BCryptPasswordEncoder(12);
   }
 }
