@@ -21,14 +21,21 @@ public class ActivityRequest {
 
   private String deviceId;
 
+  /**
+   * Zoneless wall-clock time in the caller's own timezone (the {@code X-User-Timezone} header) —
+   * not the server's. Bean Validation has no access to that header, so "not in the future" is
+   * checked in {@link com.healthcare.activitytracker.service.ActivityService} against the caller's
+   * resolved zone, not with {@code @PastOrPresent} here (which would compare against the server's
+   * own clock and wrongly reject a valid same-day time for any user ahead of it).
+   */
   @NotNull(message = "Start time is required")
-  @PastOrPresent(message = "Start time cannot be in the future")
   private LocalDateTime startedAt;
 
   /**
-   * Must be in the past or present, and must not precede startedAt (enforced by @ValidDateRange).
+   * Same zoneless, caller-timezone convention as {@link #startedAt}, and the same reason its "not
+   * in the future" check lives in the service layer rather than as {@code @PastOrPresent} here.
+   * Must not precede startedAt (enforced by @ValidDateRange).
    */
-  @PastOrPresent(message = "End time cannot be in the future")
   private LocalDateTime endedAt;
 
   /** Max 1440 min (24 h). If endedAt is also provided, must be consistent with elapsed time. */
