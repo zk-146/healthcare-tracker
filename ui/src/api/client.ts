@@ -24,6 +24,9 @@ export class ApiError extends Error {
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  put<T>(path: string, body?: unknown): Promise<T>;
+  /** Named `del` because `delete` is a reserved word. */
+  del<T>(path: string): Promise<T>;
 }
 
 async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
@@ -141,6 +144,15 @@ export function createApiClient(
         method: 'POST',
         body: body === undefined ? undefined : JSON.stringify(body),
       });
+    },
+    put<T>(path: string, body?: unknown) {
+      return request<T>(path, {
+        method: 'PUT',
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    },
+    del<T>(path: string) {
+      return request<T>(path, { method: 'DELETE' });
     },
   };
 }

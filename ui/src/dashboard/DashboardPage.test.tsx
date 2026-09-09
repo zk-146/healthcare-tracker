@@ -74,7 +74,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+    render(<DashboardPage api={api} today={today} />);
 
     await waitFor(() => expect(screen.getByText('12')).toBeInTheDocument());
     expect(screen.getByRole('heading', { name: /22 Aug/ })).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+    render(<DashboardPage api={api} today={today} />);
 
     await waitFor(() => expect(screen.getAllByRole('alert').length).toBeGreaterThan(0));
     expect(screen.getAllByTestId('chart-bar')).toHaveLength(7);
@@ -110,7 +110,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+    render(<DashboardPage api={api} today={today} />);
 
     await waitFor(() =>
       expect(screen.getByText(/too many requests/i)).toBeInTheDocument(),
@@ -129,7 +129,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+    render(<DashboardPage api={api} today={today} />);
 
     await waitFor(() =>
       expect(screen.getByText(/no activity data yet/i)).toBeInTheDocument(),
@@ -153,7 +153,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={farFutureToday} />);
+    render(<DashboardPage api={api} today={farFutureToday} />);
 
     await waitFor(() => expect(screen.getByText(/14 days ago/i)).toBeInTheDocument());
     expect(screen.queryByText(/no activity data yet/i)).not.toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('DashboardPage', () => {
       },
     });
 
-    render(<DashboardPage api={api} onSignOut={vi.fn()} today={today} />);
+    render(<DashboardPage api={api} today={today} />);
 
     await waitFor(() => expect(screen.getByText(/truncated/i)).toBeInTheDocument());
   });

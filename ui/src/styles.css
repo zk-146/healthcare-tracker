@@ -243,3 +243,212 @@ body {
   font-size: 13px;
   margin: 8px 0 0;
 }
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.app-title {
+  font-size: 18px;
+  margin: 0;
+}
+
+.app-header-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  opacity: 0.6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 4px;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: inherit;
+  border-bottom-color: currentColor;
+}
+
+.workout-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workout-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workout-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workout-row-when {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.workout-row-metrics {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 16px;
+  z-index: 10;
+}
+
+.overlay-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.overlay-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.overlay-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: inherit;
+  font: inherit;
+}
+
+.field-error {
+  font-size: 12px;
+  color: #d9534f;
+}
+
+.field-counter {
+  font-size: 11px;
+  color: var(--muted);
+  align-self: flex-end;
+}
+
+.primary-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.danger-button {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: #d9534f;
+  font: inherit;
+  cursor: pointer;
+}
+
+.confirm-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
