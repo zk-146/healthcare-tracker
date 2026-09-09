@@ -120,6 +120,12 @@ app:
     # Comma-separated list of trusted reverse-proxy IPs.
     # Only these IPs may set X-Forwarded-For. Leave empty to disable header trust.
     trusted-proxies: ${TRUSTED_PROXIES:}
+    login:
+      # Per-account failed-login throttling. Rate limiting is keyed on client IP, which does
+      # nothing against credential stuffing spread across many addresses; this counts against
+      # the account being attacked instead. Distributed via Redis when it is available.
+      max-attempts: ${LOGIN_MAX_ATTEMPTS:10}
+      lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
   summary:
     max-range-days: 365
   ollama:

@@ -38,18 +38,21 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
+  private final LoginAttemptService loginAttemptService;
 
   public AuthService(
       UserRepository userRepository,
       RefreshTokenRepository refreshTokenRepository,
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
-      TokenBlacklistService tokenBlacklistService) {
+      TokenBlacklistService tokenBlacklistService,
+      LoginAttemptService loginAttemptService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.tokenBlacklistService = tokenBlacklistService;
+    this.loginAttemptService = loginAttemptService;
   }
 
   /**
@@ -89,25 +92,39 @@ public class AuthService {
   /**
    * Authenticates a user by email and password.
    *
+   * <p>Consecutive failures are counted per account by {@link LoginAttemptService} and lock it for
+   * a cooldown once they cross the configured threshold. IP rate limiting alone does not stop
+   * credential stuffing, which simply spreads the guesses across many source addresses.
+   *
    * @param request the login credentials
    * @return access and refresh tokens on successful authentication
    * @throws com.healthcare.activitytracker.exception.UnauthorizedException if the email is not
-   *     found or the password does not match
+   *     found, the password does not match, or the account is locked out
    */
   @Transactional
   public AuthResponse login(LoginRequest request) {
     String normalizedEmail = request.getEmail().strip().toLowerCase(Locale.ROOT);
 
-    User user =
-        userRepository
-            .findByEmail(normalizedEmail)
-            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
-
-    if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-      log.warn("Failed login attempt for userId: {}", user.getId());
+    // Checked before the password comparison, and reported with the message every other failure
+    // uses, so a locked account looks exactly like a wrong password from the outside.
+    if (loginAttemptService.isLockedOut(normalizedEmail)) {
+      log.warn("Login attempt rejected: account is locked out after repeated failures");
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+
+    if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+      // Counted whether or not the address is registered: if only real accounts accumulated
+      // failures, the onset of throttling would itself reveal which addresses exist.
+      loginAttemptService.recordFailure(normalizedEmail);
+      if (user != null) {
+        log.warn("Failed login attempt for userId: {}", user.getId());
+      }
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    loginAttemptService.clearFailures(normalizedEmail);
     log.info("User logged in: {}", user.getId());
     return buildAuthResponse(user);
   }
