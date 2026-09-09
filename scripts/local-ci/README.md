@@ -17,8 +17,22 @@ suppressions.
 **The first run is a full NVD sync and is slow.** There is no NVD API key
 configured, so the initial download of the ~400k-CVE database is rate-limited: it
 took 43 minutes when measured; budget 30-90, since it varies with NVD rate
-limiting. The database is cached in the `atracker-nvd` Docker volume afterwards,
-and warm subsequent runs take about 22 seconds.
+limiting. The database is cached in the `atracker-nvd` Docker volume afterwards.
+
+After that, a run has one of two speeds:
+
+- **Within 4 hours of the last run:** dependency-check's default
+  `nvdValidForHours` (240 minutes) has not elapsed, so it logs `Skipping the NVD
+  API Update as it was completed within the last 240 minutes` and does no network
+  fetch at all. This run takes about 22 seconds.
+- **After that window:** it performs a delta fetch from NVD. With no API key that
+  fetch is rate-limited and takes materially longer — not measured here, but on
+  the order of minutes, not seconds.
+
+So a 22-second green run is **not** evidence that the CVE database is
+current — it only means the last scan was recent. When you need certainty that
+the data is fresh (e.g. before signing off a release), force a re-sync by
+removing the `atracker-nvd` volume, or run after the 4-hour window has passed.
 
 During the first sync you will see a couple of
 `[ERROR] Failed to process CVE-...` lines. These are dependency-check ingest
@@ -37,7 +51,7 @@ If you have a key, `NVD_API_KEY=... ./scripts/local-ci/owasp-scan.sh` uses it.
 Runs `mvn -B verify` — compile plus the full test suite — in a Maven container,
 exactly as the `build` job does. Maven artifacts are cached in the `atracker-m2`
 Docker volume (shared with `owasp-scan.sh`), so only the first run pays the
-download cost; a warm run is about 3 minutes.
+download cost; a warm run is about 2:50.
 
 This job is a direct container run rather than `act -j build` on purpose: `act`'s
 runner image (`catthehacker/ubuntu:act-latest`) has no Maven and no JDK, GitHub's
