@@ -55,6 +55,32 @@ Verification: 95 tests pass (3 Postgres tests skip without Docker), `mvn verify`
 
 ---
 
+## Second-round review (2026-09-09)
+
+A follow-up pass verified the controls above and then looked specifically for gaps
+*not* covered by this document. Six were found. Four of them sit in the Google Health
+integration — the newest subsystem, and the one that ships `enabled=false` — and only
+S4 was live in a default deployment.
+
+| Finding | Severity | Status | Resolution |
+|---|---|---|---|
+| S1 Default OAuth token-encryption key had no prod guard | High (latent) | **Fixed** | `JwtSecretValidator` renamed `StartupSecretValidator` and extended: with the integration enabled, the shipped default key is fatal in `prod`. Gated on `enabled` so the default stays harmless for everyone not using the integration |
+| S2 `TokenCipher` derived its AES key with one unsalted SHA-256 | High (latent) | **Fixed** | base64 32-byte values are used as the AES key directly; anything else is stretched with PBKDF2-HMAC-SHA256 at 210k iterations. The old key is retained for decrypt only, so existing rows still read and re-encrypt on next write — no ciphertext format change |
+| S3 OAuth `state` map grew without bound | Medium | **Fixed** | States carry their issue time and expire after 10 min, swept by a `@Scheduled` eviction mirroring `RateLimitingFilter`. Expired states are rejected with the same error a forged one gets |
+| S4 No per-account login throttling | Medium (live) | **Fixed** | `LoginAttemptService` counts failures per account (Redis + local fallback, mirroring `TokenBlacklistService`), fails open on Redis outage. Lockout is indistinguishable from a wrong password, and failures are counted for unregistered addresses too so throttling cannot be used to enumerate |
+| S5 `TRUSTED_PROXIES` unset behind a load balancer | Low | **Documented** | Startup WARN naming the symptom and the fix; the safe default is unchanged. Availability footgun, not a hole |
+| S6 BCrypt cost 10; no entropy check on secrets | Low | **Fixed** | Cost raised to 12 (backward compatible — BCrypt stores its cost in the hash). Validator now rejects secrets that are long but made of padding |
+
+**Deliberately not addressed.** PHI access audit logging — an immutable record of who
+read whose health data, expected by HIPAA §164.312(b). The application can prevent
+unauthorised reads (query-level tenant isolation) but cannot yet prove who performed
+authorised ones. This needs a table, a retention policy and its own design pass, so it
+is tracked as a separate piece of work rather than folded into this branch. MFA is the
+other known gap; it is the largest remaining real-world exposure, since nothing here
+defends against a phished password.
+
+---
+
 ## High
 
 ### H1. CORS blocks the `X-User-Timezone` header for browser clients
