@@ -88,6 +88,22 @@ docker run --rm \
   -v "$REPO_ROOT:/usr/src" \
   sonarsource/sonar-scanner-cli
 
+# The scanner submits its report to SonarQube's Compute Engine and returns
+# before it's processed, so reading the gate immediately can show a stale
+# (or, on a first-ever analysis, "unknown") result. Poll the CE queue for
+# this project until it's empty before reading the gate.
+# Every step here is failure-tolerant (`|| true` / defaulted expansions) so a
+# curl error or an unexpected response shape just falls through to the
+# existing gate-fetch, never a fatal exit under set -e.
+echo "==> Waiting for SonarQube to finish processing the analysis"
+for _ in $(seq 1 60); do
+  QUEUE=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_URL/api/ce/component?component=healthcare-tracker" 2>/dev/null | grep -o '"queue":\[[^]]*\]' || true)
+  if [[ "$QUEUE" == '"queue":[]' || -z "$QUEUE" ]]; then
+    break
+  fi
+  sleep 5
+done
+
 # The gate is reported, not enforced, so this never affects the exit code.
 # `|| true` guards the whole pipeline: under pipefail a curl/grep/head/cut
 # failure (network blip, gate not yet computed, auth hiccup) would otherwise
