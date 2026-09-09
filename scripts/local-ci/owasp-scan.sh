@@ -11,8 +11,11 @@
 # throwing away the expensive NVD sync.
 #
 # No NVD API key is configured for this project, so the first run performs a
-# full rate-limited sync (30-90 minutes). Every run after that fetches only a
-# delta and takes 1-4 minutes. Set NVD_API_KEY in the environment to use one.
+# full rate-limited sync (30-90 minutes). After that, a run within
+# dependency-check's nvdValidForHours window (default 4 hours) of the last one
+# skips the update and takes ~22 seconds; a run past that window does a
+# rate-limited delta fetch and takes longer (not measured here). A fast run is
+# not proof the CVE data is fresh. Set NVD_API_KEY in the environment to use one.
 
 set -euo pipefail
 

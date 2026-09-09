@@ -37,8 +37,17 @@ workflow wiring around it. Running it through `act` would mean standing up
 only to work around GitHub's runner cache semantics - pure overhead locally. So
 that job runs as a direct `docker run` of the real Maven command.
 
-The `build` and `frontend` jobs are cheap to run under `act` and there the
-workflow wiring *is* part of what we want to check, so they go through `act`.
+The `frontend` job is cheap to run under `act` and there the workflow wiring
+*is* part of what we want to check, so it goes through `act`.
+
+> **Change of record (approved mid-implementation):** this section originally
+> routed the `build` job through `act` as well. That was dropped. `act`'s pinned
+> runner image `catthehacker/ubuntu:act-latest` ships neither Maven nor a JDK
+> (GitHub's hosted runners preinstall Maven; `setup-java` only adds a JDK), and
+> this repo has no `./mvnw` wrapper, so running `build` under `act` dies with
+> `mvn: command not found`. The `build` job is therefore a direct `docker run` of `mvn -B
+> verify` via `scripts/local-ci/build.sh`, matching the approach already used for
+> `owasp`. `act` covers `frontend` only.
 
 ### Component 1: `scripts/local-ci/owasp-scan.sh`
 
@@ -64,10 +73,16 @@ A committed shell script that runs the OWASP gate in a container.
 
 No API key is configured. The first run therefore performs a full, rate-limited
 NVD sync taking 30-90 minutes. Because the result lands in the `atracker-nvd`
-volume, this happens exactly once; subsequent runs fetch only the delta and
-complete in 1-4 minutes.
+volume, this happens exactly once. Subsequent runs are one of two speeds: a run
+within dependency-check's `nvdValidForHours` window (default 4 hours) of the last
+one skips the update entirely and finishes in ~22 seconds; a run after that
+window does a rate-limited delta fetch and takes materially longer (not measured
+on this machine; the delta-fetch figure previously quoted here was only an
+unverified estimate). A fast run is therefore not evidence that the CVE data is
+current. See
+`scripts/local-ci/README.md` for the operator-facing version of this.
 
-### Component 2: `act` configuration for `build` and `frontend`
+### Component 2: `act` configuration for `frontend`, and `build.sh`
 
 - `act` installed on the host (not present today).
 - `.actrc` committed at the repo root, pinning the runner image to
@@ -76,7 +91,9 @@ complete in 1-4 minutes.
 - `.secrets` - a gitignored file holding `NVD_API_KEY=` as an empty placeholder,
   so `act` does not error on the missing secret reference if the `owasp` job is
   ever invoked through it.
-- Usage is `act -j build` and `act -j frontend`.
+- Usage is `act -j frontend`. The `build` job does **not** run under `act` (see
+  the change-of-record note above); it runs via `scripts/local-ci/build.sh`, a
+  direct `docker run` of `mvn -B verify`.
 
 The one-time cost here is the runner image pull, 5-15 minutes.
 
@@ -110,5 +127,5 @@ The work is done when:
    for the same commit.
 2. Re-running the script does not re-download the NVD database - the second run
    finishes in minutes, not tens of minutes.
-3. `act -j build` and `act -j frontend` both complete successfully.
+3. `scripts/local-ci/build.sh` and `act -j frontend` both complete successfully.
 4. `.secrets` is untracked and `git status` is clean after a run.
