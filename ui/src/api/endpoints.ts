@@ -71,7 +71,12 @@ const OPTIONAL_FIELDS = [
   'notes',
 ] as const;
 
-/** Global constraint: source is hard-coded MANUAL and endedAt is never sent. */
+/**
+ * Builds the shared create/update body from a draft. Source is hard-coded MANUAL and
+ * endedAt is never sent here — correct for createActivity (a new activity has no prior
+ * source to preserve). updateActivity overlays the original's source/deviceId/endedAt
+ * on top of this before sending, so a non-MANUAL row keeps its provenance on edit.
+ */
 function activityBody(input: ActivityInput): Record<string, unknown> {
   const body: Record<string, unknown> = {
     activityType: input.activityType,
