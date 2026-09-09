@@ -92,12 +92,53 @@ export function createActivity(api: ApiClient, input: ActivityInput): Promise<Ac
   return api.post<ActivityResponse>('/api/v1/activities', activityBody(input));
 }
 
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * Adds `durationMinutes` minutes to a zoneless "YYYY-MM-DDTHH:mm:ss" string, returning
+ * a zoneless string in the same shape. Built by hand (not `new Date(...).toISOString()`)
+ * because the backend's LocalDateTime has no zone and toISOString() would introduce UTC.
+ */
+function computedEndOf(startedAt: string, durationMinutes: number): string {
+  const [datePart, timePart] = startedAt.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute, second] = timePart.split(':').map(Number);
+  const local = new Date(year, month - 1, day, hour, minute, second);
+  local.setMinutes(local.getMinutes() + durationMinutes);
+  return (
+    `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}` +
+    `T${pad(local.getHours())}:${pad(local.getMinutes())}:${pad(local.getSeconds())}`
+  );
+}
+
+/**
+ * Unlike createActivity, an update must carry the original activity's source and
+ * deviceId through untouched: the backend's PUT is a full field replace, and a row
+ * with source CSV_IMPORT/IOT (and its deviceId) must not be silently flipped to
+ * MANUAL/null just because the user edited an unrelated field. endedAt is echoed
+ * back only when it is still consistent with the (possibly edited) startedAt/
+ * durationMinutes being submitted; otherwise it is omitted, same as before.
+ */
 export function updateActivity(
   api: ApiClient,
   id: string,
   input: ActivityInput,
+  original: ActivityResponse,
 ): Promise<ActivityResponse> {
-  return api.put<ActivityResponse>(`/api/v1/activities/${id}`, activityBody(input));
+  const body = activityBody(input);
+  body.source = original.source;
+  if (original.deviceId !== null) {
+    body.deviceId = original.deviceId;
+  }
+  if (
+    original.endedAt !== null &&
+    original.endedAt === computedEndOf(input.startedAt, input.durationMinutes)
+  ) {
+    body.endedAt = original.endedAt;
+  }
+  return api.put<ActivityResponse>(`/api/v1/activities/${id}`, body);
 }
 
 export function deleteActivity(api: ApiClient, id: string): Promise<void> {

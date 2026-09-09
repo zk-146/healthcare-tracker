@@ -179,7 +179,7 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
       if (initial === undefined) {
         await createActivity(api, input);
       } else {
-        await updateActivity(api, initial.id, input);
+        await updateActivity(api, initial.id, input, initial);
       }
       onSaved();
       onClose();
