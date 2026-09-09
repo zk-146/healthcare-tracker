@@ -16,12 +16,11 @@ const CHART_DAYS = 7;     // display window: what the chart and recent-days list
 
 interface DashboardPageProps {
   api: ApiClient;
-  onSignOut(): void;
   /** Injectable for tests; defaults to now. */
   today?: Date;
 }
 
-export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardPageProps) {
+export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
   const lookbackKeys = rollingWindow(today, LOOKBACK_DAYS);
   const chartKeys = lookbackKeys.slice(-CHART_DAYS);
   const from = lookbackKeys[0];
@@ -58,14 +57,7 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
   const latestBucket = lookbackBuckets.find((bucket) => bucket.dayKey === latestDayKey) ?? null;
 
   return (
-    <main className="page">
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ fontSize: 18, margin: 0 }}>Activity</h1>
-        <button type="button" onClick={onSignOut} style={{ background: 'none', border: 0, color: 'inherit', opacity: 0.6 }}>
-          Sign out
-        </button>
-      </header>
-
+    <>
       {summary.state === 'loading' && <Skeleton height={150} />}
       {summary.state === 'error' && <ErrorNote message={summary.message} />}
       {summary.state === 'ready' && <StreakHero streakDays={summary.value.streakDays} />}
@@ -88,6 +80,6 @@ export function DashboardPage({ api, onSignOut, today = new Date() }: DashboardP
           syncError={sync.state === 'error'}
         />
       )}
-    </main>
+    </>
   );
 }
