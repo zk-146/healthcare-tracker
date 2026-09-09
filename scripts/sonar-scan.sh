@@ -65,12 +65,14 @@ if ! curl -sf "$SONAR_URL/api/system/status" 2>/dev/null | grep -q '"status":"UP
   exit 1
 fi
 
-echo "==> Backend: compiling and running tests with coverage"
+echo "==> Backend: compiling, testing with coverage, and staging dependency jars"
+# copy-dependencies populates target/dependency, which sonar.java.libraries globs
+# so Java type resolution is precise (otherwise the scanner warns).
 docker run --rm \
   -v "$REPO_ROOT:/app" \
   -v "$M2_CACHE:/root/.m2" \
   -w /app "$MAVEN_IMAGE" \
-  mvn -B test
+  mvn -B test dependency:copy-dependencies -DoutputDirectory=target/dependency
 
 echo "==> Frontend: running tests with coverage"
 docker run --rm \
