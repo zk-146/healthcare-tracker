@@ -114,3 +114,10 @@ docs/
 
 # Frontend build output copied in by the Docker ui stage
 src/main/resources/static/
+
+# ========================
+# Code quality — SonarQube
+# ========================
+.scannerwork/
+.sonar/
+ui/coverage/

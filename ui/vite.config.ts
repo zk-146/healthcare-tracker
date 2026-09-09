@@ -19,5 +19,15 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
+    coverage: {
+      // lcov is what the Sonar scanner reads; text keeps the summary visible in
+      // the terminal. Only reached via `npm run test:coverage`, so plain
+      // `npm test` and the CI frontend job are unaffected.
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/setupTests.ts', 'src/main.tsx'],
+    },
   },
 });
