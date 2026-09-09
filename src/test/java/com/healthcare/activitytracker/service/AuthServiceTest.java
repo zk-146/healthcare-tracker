@@ -38,9 +38,15 @@ class AuthServiceTest {
   private JwtUtil jwtUtil;
   private AuthService authService;
 
+  /** Real instance with no Redis (in-memory fallback) so lockout is genuinely exercised. */
+  private LoginAttemptService loginAttemptService;
+
+  private static final int MAX_ATTEMPTS = 3;
+
   @BeforeEach
   void setUp() {
     passwordEncoder = new BCryptPasswordEncoder();
+    loginAttemptService = new LoginAttemptService(null, MAX_ATTEMPTS, 15);
     jwtUtil =
         new JwtUtil(
             "test-secret-key-for-unit-tests-must-be-at-least-32-chars",
@@ -55,7 +61,8 @@ class AuthServiceTest {
             refreshTokenRepository,
             passwordEncoder,
             jwtUtil,
-            tokenBlacklistService);
+            tokenBlacklistService,
+            loginAttemptService);
   }
 
   @Test
@@ -289,5 +296,97 @@ class AuthServiceTest {
 
     verify(userRepository, never()).save(any(User.class));
     verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+  }
+
+  @Test
+  void login_locksAccountOut_afterRepeatedFailures() {
+    LoginRequest request = new LoginRequest();
+    request.setEmail("user@example.com");
+    request.setPassword("wrongpassword!");
+
+    User user =
+        User.builder()
+            .id(UUID.randomUUID())
+            .email("user@example.com")
+            .passwordHash(passwordEncoder.encode("correctpassword!"))
+            .fullName("Test User")
+            .build();
+
+    when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      assertThatThrownBy(() -> authService.login(request))
+          .isInstanceOf(UnauthorizedException.class);
+    }
+
+    // Now locked out: rejected before the password is even compared, and with the same
+    // message a wrong password gets, so lockout state leaks nothing.
+    assertThatThrownBy(() -> authService.login(request))
+        .isInstanceOf(UnauthorizedException.class)
+        .hasMessage("Invalid email or password");
+    assertThat(loginAttemptService.isLockedOut("user@example.com")).isTrue();
+  }
+
+  @Test
+  void login_countsFailuresForUnregisteredAddressesToo() {
+    LoginRequest request = new LoginRequest();
+    request.setEmail("unknown@example.com");
+    request.setPassword("StrongP@ss123");
+
+    when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      assertThatThrownBy(() -> authService.login(request))
+          .isInstanceOf(UnauthorizedException.class);
+    }
+
+    // Throttling must not begin only for real accounts, or its onset would identify them.
+    assertThat(loginAttemptService.isLockedOut("unknown@example.com")).isTrue();
+  }
+
+  @Test
+  void login_lockoutIsScopedToTheTargetedAccount() {
+    LoginRequest attacked = new LoginRequest();
+    attacked.setEmail("victim@example.com");
+    attacked.setPassword("wrongpassword!");
+
+    when(userRepository.findByEmail("victim@example.com")).thenReturn(Optional.empty());
+
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      assertThatThrownBy(() -> authService.login(attacked))
+          .isInstanceOf(UnauthorizedException.class);
+    }
+
+    assertThat(loginAttemptService.isLockedOut("victim@example.com")).isTrue();
+    assertThat(loginAttemptService.isLockedOut("bystander@example.com")).isFalse();
+  }
+
+  @Test
+  void login_successfulAuthenticationClearsEarlierFailures() {
+    User user =
+        User.builder()
+            .id(UUID.randomUUID())
+            .email("user@example.com")
+            .passwordHash(passwordEncoder.encode("StrongP@ss123"))
+            .fullName("Test User")
+            .build();
+
+    when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+    when(refreshTokenRepository.save(any(RefreshToken.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    LoginRequest wrong = new LoginRequest();
+    wrong.setEmail("user@example.com");
+    wrong.setPassword("wrongpassword!");
+    assertThatThrownBy(() -> authService.login(wrong)).isInstanceOf(UnauthorizedException.class);
+
+    LoginRequest correct = new LoginRequest();
+    correct.setEmail("user@example.com");
+    correct.setPassword("StrongP@ss123");
+    authService.login(correct);
+
+    // The counter is reset, so the earlier failure cannot combine with later ones to
+    // lock out a user who has since proved they know the password.
+    assertThat(loginAttemptService.isLockedOut("user@example.com")).isFalse();
   }
 }

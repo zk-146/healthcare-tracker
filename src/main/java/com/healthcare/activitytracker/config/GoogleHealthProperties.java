@@ -43,8 +43,18 @@ public class GoogleHealthProperties {
           "https://www.googleapis.com/auth/health.heartrate.read",
           "https://www.googleapis.com/auth/health.location.read");
 
-  /** Passphrase used to derive the AES key that encrypts stored OAuth tokens. */
-  private String tokenEncryptionKey = "change-me-token-encryption-key";
+  /**
+   * The token-encryption key that ships in this repository. {@code StartupSecretValidator} refuses
+   * to start the {@code prod} profile with this value once the integration is enabled.
+   */
+  public static final String DEFAULT_TOKEN_ENCRYPTION_KEY = "change-me-token-encryption-key";
+
+  /**
+   * Key used to encrypt stored OAuth tokens at rest. Preferably a base64-encoded 32 random bytes
+   * ({@code openssl rand -base64 32}), which is used as the AES key directly; any other value is
+   * treated as a passphrase and stretched with PBKDF2. See {@code TokenCipher}.
+   */
+  private String tokenEncryptionKey = DEFAULT_TOKEN_ENCRYPTION_KEY;
 
   /** Stored in {@code activities.device_id} for imported workouts. */
   private String deviceLabel = "fitbit-charge-6";

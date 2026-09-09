@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -24,21 +26,35 @@ import org.springframework.web.util.UriComponentsBuilder;
  * the callback (the callback is unauthenticated, since Google redirects the browser without a JWT).
  * An in-memory map is sufficient for this single-instance personal integration; a multi-instance
  * deployment would persist the mapping in a shared store instead.
+ *
+ * <p>Entries expire after {@link #STATE_TTL_MS}. Only a completed callback consumes one, so without
+ * a TTL every abandoned consent flow would leak an entry for the lifetime of the process.
  */
 @Service
 public class GoogleHealthOAuthService {
 
   private static final Logger log = LoggerFactory.getLogger(GoogleHealthOAuthService.class);
 
+  /** How long a generated {@code state} stays redeemable. Generous for a consent round-trip. */
+  static final long STATE_TTL_MS = 600_000;
+
   private final GoogleHealthProperties properties;
   private final ObjectMapper objectMapper;
   private final RestClient restClient;
   private final SecureRandom secureRandom = new SecureRandom();
-  private final ConcurrentHashMap<String, UUID> stateToUser = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, StateEntry> stateToUser = new ConcurrentHashMap<>();
+  private final LongSupplier nowMs;
 
   public GoogleHealthOAuthService(GoogleHealthProperties properties, ObjectMapper objectMapper) {
+    this(properties, objectMapper, System::currentTimeMillis);
+  }
+
+  /** Seam for tests that need to advance past {@link #STATE_TTL_MS} without sleeping. */
+  GoogleHealthOAuthService(
+      GoogleHealthProperties properties, ObjectMapper objectMapper, LongSupplier nowMs) {
     this.properties = properties;
     this.objectMapper = objectMapper;
+    this.nowMs = nowMs;
     this.restClient = RestClient.create();
   }
 
@@ -49,7 +65,7 @@ public class GoogleHealthOAuthService {
     byte[] stateBytes = new byte[24];
     secureRandom.nextBytes(stateBytes);
     String state = Base64.getUrlEncoder().withoutPadding().encodeToString(stateBytes);
-    stateToUser.put(state, userId);
+    stateToUser.put(state, new StateEntry(userId, nowMs.getAsLong()));
 
     return UriComponentsBuilder.fromUriString(properties.getAuthUri())
         .queryParam("client_id", properties.getClientId())
@@ -69,14 +85,42 @@ public class GoogleHealthOAuthService {
    * Verifies a callback {@code state} and returns the user id it was issued for, consuming it so it
    * cannot be replayed.
    *
-   * @throws IllegalStateException if the state is unknown (mismatch / already used / possible CSRF)
+   * @throws IllegalStateException if the state is unknown (mismatch / already used / expired /
+   *     possible CSRF)
    */
   public UUID consumeStateToUserId(String state) {
-    UUID userId = state == null ? null : stateToUser.remove(state);
-    if (userId == null) {
+    StateEntry entry = state == null ? null : stateToUser.remove(state);
+    // An entry the sweep has not reached yet is still expired, and is rejected exactly as a
+    // forged one is: the caller cannot tell the two apart.
+    if (entry == null || entry.isExpiredAt(nowMs.getAsLong())) {
       throw new IllegalStateException("OAuth state mismatch — possible CSRF, aborting");
     }
-    return userId;
+    return entry.userId();
+  }
+
+  /**
+   * Drops states that were issued but never redeemed, keeping the map bounded when consent flows
+   * are abandoned. Mirrors the eviction {@code RateLimitingFilter} runs over its buckets.
+   */
+  @Scheduled(fixedRate = 60_000)
+  public void evictExpiredStates() {
+    long now = nowMs.getAsLong();
+    int before = stateToUser.size();
+    stateToUser.entrySet().removeIf(e -> e.getValue().isExpiredAt(now));
+    int removed = before - stateToUser.size();
+    if (removed > 0) {
+      log.debug(
+          "OAuth state eviction: removed {} expired states, remaining={}",
+          removed,
+          stateToUser.size());
+    }
+  }
+
+  /** Pairs the user a {@code state} was issued for with the epoch-ms instant it was issued. */
+  private record StateEntry(UUID userId, long issuedAtMs) {
+    boolean isExpiredAt(long nowMs) {
+      return nowMs - issuedAtMs > STATE_TTL_MS;
+    }
   }
 
   /** Exchanges an authorization code for access + refresh tokens. */
