@@ -82,3 +82,21 @@ export interface ApiErrorBody {
   details?: Record<string, string>;
   timestamp?: string;
 }
+
+/**
+ * The subset of ActivityRequest a manual workout supplies. `source` is always
+ * MANUAL and `endedAt` is never sent: the backend's @ValidDateRange rule requires
+ * endedAt and durationMinutes to agree when both are present, and the form only
+ * collects duration.
+ */
+export interface ActivityInput {
+  activityType: ActivityType;
+  /** Zoneless LocalDateTime, "YYYY-MM-DDTHH:mm:ss". */
+  startedAt: string;
+  durationMinutes: number;
+  distanceKm?: number;
+  caloriesBurned?: number;
+  steps?: number;
+  heartRateAvg?: number;
+  notes?: string;
+}
