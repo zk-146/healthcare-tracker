@@ -30,6 +30,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * balancer the effective limit is up to N x the configured value. If strict global limits are
  * required, replace the bucket maps with a distributed bucket4j backend (e.g. {@code
  * bucket4j-redis}) — Redis is already part of the deployment for the token blacklist.
+ *
+ * <p><strong>Deployment:</strong> set {@code app.security.trusted-proxies} whenever this runs
+ * behind a load balancer. Without it every request keys on the balancer's address and all callers
+ * share one bucket; {@link #init()} warns about this at startup.
+ *
+ * <p>This limits by client address only. Failed logins are additionally counted per account by
+ * {@code LoginAttemptService}, which is what stops credential stuffing spread across many IPs.
  */
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -83,6 +90,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .filter(s -> !s.isEmpty())
             .collect(Collectors.toSet());
     log.info("Rate limiter initialized: trusted proxies={}", trustedProxies);
+    if (trustedProxies.isEmpty()) {
+      // Not a security problem -- refusing to trust X-Forwarded-For is the safe default, and
+      // spoofing it is exactly what this prevents. It is an availability one: behind a load
+      // balancer every request resolves to the balancer's own address, so all callers share a
+      // single bucket and the deployment rate-limits itself.
+      log.warn(
+          "No trusted proxies configured, so X-Forwarded-For is ignored and rate limiting keys "
+              + "on the direct peer address. If this instance sits behind a load balancer or "
+              + "reverse proxy, set TRUSTED_PROXIES to its address -- otherwise every client "
+              + "shares one bucket and legitimate traffic will be throttled collectively.");
+    }
   }
 
   @Override
