@@ -1,5 +1,6 @@
 package com.healthcare.activitytracker.service;
 
+import com.healthcare.activitytracker.exception.FieldValidationException;
 import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ActivityRequest;
 import com.healthcare.activitytracker.model.dto.ActivityResponse;
@@ -14,6 +15,7 @@ import com.healthcare.activitytracker.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -51,6 +53,23 @@ public class ActivityService {
     this.activityEventPublisher = activityEventPublisher;
     this.activityTypeMapper = activityTypeMapper;
     this.calorieEstimator = calorieEstimator;
+  }
+
+  /**
+   * Rejects a startedAt/endedAt that is in the future <em>for the caller</em>. ActivityRequest
+   * carries zoneless wall-clock times in the caller's own timezone (see its field docs), so this
+   * must compare against {@code LocalDateTime.now(zone)} for the caller's resolved zone — never the
+   * server's own clock, which is what a bare {@code @PastOrPresent} on the DTO would do and why
+   * that annotation was removed from ActivityRequest in favor of this check.
+   */
+  private void validateNotFuture(ActivityRequest request, ZoneId zone) {
+    LocalDateTime now = LocalDateTime.now(zone);
+    if (request.getStartedAt() != null && request.getStartedAt().isAfter(now)) {
+      throw new FieldValidationException("startedAt", "Start time cannot be in the future");
+    }
+    if (request.getEndedAt() != null && request.getEndedAt().isAfter(now)) {
+      throw new FieldValidationException("endedAt", "End time cannot be in the future");
+    }
   }
 
   /** Uses the client-supplied calories when present, otherwise a server-side MET estimate. */
@@ -137,12 +156,17 @@ public class ActivityService {
    *
    * @param userId the authenticated user's ID
    * @param request the activity details to persist
+   * @param zone the caller's resolved timezone, used only to validate startedAt/endedAt are not in
+   *     the future for that caller (see {@link #validateNotFuture})
    * @return the persisted activity as a response DTO
    * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
    *     exist
+   * @throws com.healthcare.activitytracker.exception.FieldValidationException if startedAt or
+   *     endedAt is in the future for the caller
    */
   @Transactional
-  public ActivityResponse createActivity(UUID userId, ActivityRequest request) {
+  public ActivityResponse createActivity(UUID userId, ActivityRequest request, ZoneId zone) {
+    validateNotFuture(request, zone);
     User user =
         userRepository
             .findById(userId)
@@ -256,12 +280,18 @@ public class ActivityService {
    * @param userId the authenticated user's ID
    * @param activityId the activity to update
    * @param request the new activity details
+   * @param zone the caller's resolved timezone, used only to validate startedAt/endedAt are not in
+   *     the future for that caller (see {@link #validateNotFuture})
    * @return the updated activity as a response DTO
    * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the activity does
    *     not exist or belongs to a different user
+   * @throws com.healthcare.activitytracker.exception.FieldValidationException if startedAt or
+   *     endedAt is in the future for the caller
    */
   @Transactional
-  public ActivityResponse updateActivity(UUID userId, UUID activityId, ActivityRequest request) {
+  public ActivityResponse updateActivity(
+      UUID userId, UUID activityId, ActivityRequest request, ZoneId zone) {
+    validateNotFuture(request, zone);
     Activity activity =
         activityRepository
             .findByIdAndUserId(activityId, userId)

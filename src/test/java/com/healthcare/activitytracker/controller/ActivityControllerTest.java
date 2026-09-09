@@ -1,6 +1,8 @@
 package com.healthcare.activitytracker.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.SecurityConfig;
+import com.healthcare.activitytracker.exception.FieldValidationException;
 import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ActivityRequest;
 import com.healthcare.activitytracker.model.dto.ActivityResponse;
@@ -20,6 +23,8 @@ import com.healthcare.activitytracker.service.NotesAnalysisService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -63,22 +68,28 @@ class ActivityControllerTest {
         .id(UUID.randomUUID())
         .activityType(ActivityType.RUNNING)
         .source(ActivitySource.MANUAL)
-        .startedAt(LocalDateTime.now().minusHours(1))
-        .createdAt(LocalDateTime.now())
+        .startedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1))
+        .createdAt(LocalDateTime.now(ZoneOffset.UTC))
         .build();
   }
 
+  /**
+   * Built against a fixed clock (UTC) rather than the JVM default zone: activityService is mocked
+   * in this class, so nothing here currently reaches the real future-date check, but a request
+   * built from LocalDateTime.now() with no explicit zone would silently start failing that check on
+   * a machine east of UTC the day it does.
+   */
   private ActivityRequest validRequest() {
     ActivityRequest req = new ActivityRequest();
     req.setActivityType(ActivityType.RUNNING);
     req.setSource(ActivitySource.MANUAL);
-    req.setStartedAt(LocalDateTime.now().minusHours(1));
+    req.setStartedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
     return req;
   }
 
   @Test
   void createActivity_returns201_onSuccess() throws Exception {
-    when(activityService.createActivity(any(), any())).thenReturn(mockResponse());
+    when(activityService.createActivity(any(), any(), any())).thenReturn(mockResponse());
 
     mockMvc
         .perform(
@@ -88,6 +99,82 @@ class ActivityControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest())))
         .andExpect(status().isCreated());
+  }
+
+  @Test
+  void createActivity_passesResolvedZone_fromTimezoneHeader() throws Exception {
+    // A stub matched on the expected zone would silently return null (Mockito's default for an
+    // unmatched call on a @MockBean, since strict stubbing isn't on) and the assertion below
+    // would still pass on a 201 with a null body -- so this stubs loosely and verifies the exact
+    // zone actually received instead, which fails loudly if the wrong one (or none) arrives.
+    when(activityService.createActivity(any(), any(), any())).thenReturn(mockResponse());
+
+    mockMvc
+        .perform(
+            post("/api/v1/activities")
+                .with(uuidUser())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest()))
+                .header("X-User-Timezone", "Asia/Kolkata"))
+        .andExpect(status().isCreated());
+
+    verify(activityService).createActivity(any(), any(), eq(ZoneId.of("Asia/Kolkata")));
+  }
+
+  @Test
+  void createActivity_defaultsToUtc_whenTimezoneHeaderAbsent() throws Exception {
+    when(activityService.createActivity(any(), any(), any())).thenReturn(mockResponse());
+
+    mockMvc
+        .perform(
+            post("/api/v1/activities")
+                .with(uuidUser())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest())))
+        .andExpect(status().isCreated());
+
+    verify(activityService).createActivity(any(), any(), eq(ZoneOffset.UTC));
+  }
+
+  /**
+   * FieldValidationException is thrown by the service (not Bean Validation) when startedAt is in
+   * the future for the caller. Asserts GlobalExceptionHandler maps it to the same {@code details:
+   * {field: message}} shape MethodArgumentNotValidException produces, so the frontend's existing
+   * 400-details-to-field mapping keeps working regardless of which layer rejected it.
+   */
+  @Test
+  void createActivity_returns400WithFieldDetails_whenServiceRejectsFutureStartedAt()
+      throws Exception {
+    when(activityService.createActivity(any(), any(), any()))
+        .thenThrow(new FieldValidationException("startedAt", "Start time cannot be in the future"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/activities")
+                .with(uuidUser())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Validation failed"))
+        .andExpect(jsonPath("$.details.startedAt").value("Start time cannot be in the future"));
+  }
+
+  @Test
+  void updateActivity_returns200_onSuccess() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(activityService.updateActivity(any(), any(), any(), any())).thenReturn(mockResponse());
+
+    mockMvc
+        .perform(
+            put("/api/v1/activities/" + id)
+                .with(uuidUser())
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest())))
+        .andExpect(status().isOk());
   }
 
   @Test
