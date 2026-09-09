@@ -149,7 +149,7 @@ public class SummaryService {
    */
   public SummaryResponse getWeeklySummary(UUID userId, ZoneId zone) {
     LocalDate today = LocalDate.now(zone);
-    LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1);
+    LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
     return getSummary(userId, weekStart, today, zone);
   }
 
