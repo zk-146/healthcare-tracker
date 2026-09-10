@@ -23,6 +23,7 @@ function stubApi(overrides: Partial<ApiClient> = {}): ApiClient {
     post: vi.fn(),
     put: vi.fn().mockResolvedValue(profile),
     del: vi.fn().mockResolvedValue(undefined),
+    postForm: vi.fn(),
     ...overrides,
   };
 }

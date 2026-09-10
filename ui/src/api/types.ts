@@ -73,6 +73,17 @@ export interface GoogleHealthConnectResponse {
 
 export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
 
+/** Response to a Fitbit dailyActivity_merged.csv import. */
+export interface CsvImportResponse {
+  fileName: string;
+  totalRows: number;
+  imported: number;
+  duplicatesSkipped: number;
+  failed: number;
+  /** Row-level error messages, capped to a bounded prefix by the backend. */
+  errors: string[];
+}
+
 export interface DigestResponse {
   period: string;
   from: string;

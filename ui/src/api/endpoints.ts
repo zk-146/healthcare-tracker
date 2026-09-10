@@ -3,6 +3,7 @@ import type {
   ActivityInput,
   ActivityResponse,
   AuthResponse,
+  CsvImportResponse,
   DigestResponse,
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
@@ -230,6 +231,14 @@ export function listAllActivities(api: ApiClient, page: number): Promise<Page<Ac
     sort: 'startedAt,desc',
   });
   return api.get<Page<ActivityResponse>>(`/api/v1/activities?${params.toString()}`);
+}
+
+/** Imports a Fitbit `dailyActivity_merged.csv` export. Rows already imported are
+ *  skipped server-side; malformed rows are skipped and reported, not fatal. */
+export function importFitbitCsv(api: ApiClient, file: File): Promise<CsvImportResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  return api.postForm<CsvImportResponse>('/api/v1/activities/import/fitbit', form);
 }
 
 export function getProfile(api: ApiClient): Promise<ProfileResponse> {

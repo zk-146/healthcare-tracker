@@ -206,4 +206,23 @@ describe('createApiClient', () => {
       body: { error: 'Activity was modified' },
     });
   });
+
+  it('sends a multipart POST without hand-setting Content-Type', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ imported: 3 }));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+    const form = new FormData();
+    form.append('file', new File(['a,b\n1,2'], 'export.csv', { type: 'text/csv' }));
+
+    const result = await api.postForm('/api/v1/activities/import/fitbit', form);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/activities/import/fitbit');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(form);
+    // Left unset deliberately: the browser derives Content-Type (with the multipart
+    // boundary) from the FormData body itself; a hand-set value would break the upload.
+    expect((init.headers as Headers).get('Content-Type')).toBeNull();
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer access-1');
+    expect(result).toEqual({ imported: 3 });
+  });
 });
