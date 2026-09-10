@@ -1,5 +1,6 @@
 import { ApiError, type ApiClient } from './client';
 import type {
+  ActivityFilters,
   ActivityInput,
   ActivityResponse,
   AuthResponse,
@@ -224,12 +225,25 @@ export function deleteActivity(api: ApiClient, id: string): Promise<void> {
  * Full history, newest first — unlike listActivities, which windows by date for the
  * dashboard. Page size 20 keeps the first paint small on a phone.
  */
-export function listAllActivities(api: ApiClient, page: number): Promise<Page<ActivityResponse>> {
+export function listAllActivities(
+  api: ApiClient,
+  page: number,
+  filters: ActivityFilters = {},
+): Promise<Page<ActivityResponse>> {
   const params = new URLSearchParams({
     page: String(page),
     size: '20',
     sort: 'startedAt,desc',
   });
+  if (filters.activityType !== undefined) {
+    params.set('activityType', filters.activityType);
+  }
+  if (filters.from !== undefined) {
+    params.set('from', filters.from);
+  }
+  if (filters.to !== undefined) {
+    params.set('to', filters.to);
+  }
   return api.get<Page<ActivityResponse>>(`/api/v1/activities?${params.toString()}`);
 }
 

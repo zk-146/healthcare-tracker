@@ -315,6 +315,19 @@ body {
   margin-bottom: 12px;
 }
 
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filter-row .field {
+  flex: 1 1 130px;
+  min-width: 110px;
+}
+
 .segmented-button {
   background: none;
   border: 1px solid var(--line);

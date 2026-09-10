@@ -29,6 +29,17 @@ function pageOf(content: ActivityResponse[], number = 0, totalPages = 1) {
   return { content, totalElements: content.length, totalPages, number, size: 20 };
 }
 
+/**
+ * The activity-type filter <select> now carries an <option> with the same text as
+ * every row's type label (e.g. "Cycling" appears both as a row and as a filter
+ * option), so a bare getByText/findByText('Cycling') is ambiguous. Match only the
+ * row's own span instead.
+ */
+function rowType(label: string) {
+  return (content: string, element: Element | null) =>
+    content === label && element?.classList.contains('workout-row-type') === true;
+}
+
 function apiWithPages(pages: Record<number, ReturnType<typeof pageOf>>): ApiClient {
   return {
     get: vi.fn(async (path: string) => {
@@ -47,7 +58,7 @@ describe('WorkoutsPage', () => {
     const api = apiWithPages({ 0: pageOf([activity()]) });
     render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
 
-    expect(await screen.findByText('Cycling')).toBeInTheDocument();
+    expect(await screen.findByText(rowType('Cycling'))).toBeInTheDocument();
     expect(screen.getByText('50 min')).toBeInTheDocument();
     expect(screen.getByText('18.4 km')).toBeInTheDocument();
   });
@@ -69,8 +80,8 @@ describe('WorkoutsPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Load more' }));
 
-    expect(await screen.findByText('Running')).toBeInTheDocument();
-    expect(screen.getByText('Cycling')).toBeInTheDocument();
+    expect(await screen.findByText(rowType('Running'))).toBeInTheDocument();
+    expect(screen.getByText(rowType('Cycling'))).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument(),
     );
@@ -205,5 +216,64 @@ describe('WorkoutsPage', () => {
       );
       expect(pageZeroCalls.length).toBe(2);
     });
+  });
+
+  it('refetches with the activityType filter applied, and clears it', async () => {
+    const user = userEvent.setup();
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(
+      <WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />,
+    );
+    await screen.findByText(rowType('Cycling'));
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'RUNNING');
+
+    await waitFor(() => {
+      const calls = (api.get as unknown as { mock: { calls: string[][] } }).mock.calls;
+      expect(calls.some(([path]) => path.includes('activityType=RUNNING'))).toBe(true);
+    });
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      const calls = (api.get as unknown as { mock: { calls: string[][] } }).mock.calls;
+      const last = calls.at(-1);
+      expect(last?.[0]).not.toContain('activityType=');
+    });
+  });
+
+  it('requests the from/to date filters together', async () => {
+    const user = userEvent.setup();
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(
+      <WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />,
+    );
+    await screen.findByText(rowType('Cycling'));
+
+    await user.type(screen.getByLabelText('From'), '2026-08-01');
+    await user.type(screen.getByLabelText('To'), '2026-08-31');
+
+    await waitFor(() => {
+      const calls = (api.get as unknown as { mock: { calls: string[][] } }).mock.calls;
+      const last = calls.at(-1)?.[0] ?? '';
+      expect(last).toContain('from=2026-08-01');
+      expect(last).toContain('to=2026-08-31');
+    });
+  });
+
+  it('shows a filter-aware empty state', async () => {
+    const user = userEvent.setup();
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(
+      <WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />,
+    );
+    await screen.findByText(rowType('Cycling'));
+
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue(pageOf([]));
+    await user.selectOptions(screen.getByLabelText('Type'), 'YOGA');
+
+    expect(await screen.findByText('No workouts match these filters.')).toBeInTheDocument();
   });
 });
