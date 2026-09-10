@@ -11,6 +11,7 @@ import { LatestDayCard } from './LatestDayCard';
 import { RecentDaysList } from './RecentDaysList';
 import { SevenDayChart } from './SevenDayChart';
 import { StreakHero } from './StreakHero';
+import { SummaryDetailsCard } from './SummaryDetailsCard';
 
 const LOOKBACK_DAYS = 30; // fetch window: wide enough to find the newest row even when stale
 const CHART_DAYS = 7;     // display window: what the chart and recent-days list show
@@ -76,6 +77,8 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
           <RecentDaysList buckets={chartBuckets} />
         </>
       )}
+
+      <SummaryDetailsCard api={api} />
 
       {sync.state !== 'loading' && (
         <FreshnessCard
