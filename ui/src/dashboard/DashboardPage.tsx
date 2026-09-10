@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { type ApiClient } from '../api/client';
 import { getDailySummary, getSyncStatus, listActivities } from '../api/endpoints';
 import type { ActivityResponse, GoogleHealthStatusResponse, SummaryResponse } from '../api/types';
@@ -21,6 +22,7 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
+  const [syncReloadKey, setSyncReloadKey] = useState(0);
   const lookbackKeys = rollingWindow(today, LOOKBACK_DAYS);
   const chartKeys = lookbackKeys.slice(-CHART_DAYS);
   const from = lookbackKeys[0];
@@ -39,7 +41,10 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
       }),
     [api, from, to],
   );
-  const sync = useLoadable<GoogleHealthStatusResponse>(() => getSyncStatus(api), [api]);
+  const sync = useLoadable<GoogleHealthStatusResponse>(
+    () => getSyncStatus(api),
+    [api, syncReloadKey],
+  );
 
   const lookbackBuckets: DayBucket[] =
     activities.state === 'ready' ? bucketByDay(activities.value, lookbackKeys) : [];
@@ -74,10 +79,12 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
 
       {sync.state !== 'loading' && (
         <FreshnessCard
+          api={api}
           latestDayKey={latestDayKey}
           today={today}
           status={sync.state === 'ready' ? sync.value : null}
           syncError={sync.state === 'error'}
+          onDisconnected={() => setSyncReloadKey((current) => current + 1)}
         />
       )}
     </>
