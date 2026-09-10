@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
     <!--
-        Every entry below is a vulnerability with NO published fix for the version line
-        Spring Boot 3.5.x pins. Spring Framework 6.2.20 and Spring Security 6.5.12 are the
-        announced fix versions; neither exists on Maven Central (both 404 as of 2026-09-07),
-        so there is nothing to upgrade to. They are suppressed on the narrower ground that
-        this application does not use the vulnerable feature at all - each note records the
-        check that establishes it.
+        Every entry below is a vulnerability with NO OSS fix for the version line Spring
+        Boot 3.5.x pins. Spring Framework 6.2.x reached open-source end-of-life on
+        2026-06-30: the announced fixes (6.2.20, 6.5.12, ...) ship to Enterprise Support
+        subscribers only and never reach Maven Central. The only open-source fix is Spring
+        Framework 7.0.9, i.e. an upgrade to Spring Boot 4.x - a major-version migration
+        tracked separately, not something this file can wait on. Until that lands, these
+        are suppressed on the narrower ground that this application does not use the
+        vulnerable feature at all - each note records the check that establishes it.
 
         Every entry carries until="2026-12-31Z". When that passes the suppression lapses and
         the build goes red again, forcing a re-check of whether the fix has shipped. Do not
@@ -24,7 +26,7 @@
         org.webjars:swagger-ui to 5.32.14 in pom.xml, which bundles DOMPurify 3.4.13.
     -->
 
-    <!-- ===== Spring Framework 6.2.19 (fix 6.2.20 unpublished) ===== -->
+    <!-- ===== Spring Framework 6.2.19 (OSS fix only in 7.0.9 / Spring Boot 4.x) ===== -->
 
     <suppress until="2026-12-31Z">
         <notes><![CDATA[
@@ -96,7 +98,66 @@
         <cve>CVE-2026-59313</cve>
     </suppress>
 
-    <!-- ===== Spring Security 6.5.11 (fix 6.5.12 unpublished) ===== -->
+    <!-- Disclosed 2026-09-10, after Spring Framework 6.2.x OSS EOL. All five below are
+         CVSS >= 7 in the NVD feed and are what currently fails the gate. -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            XsltView SSRF/RCE (CVSS 9.8). Requires an MVC "/**" mapping that resolves to
+            view rendering with the view name left unspecified, so a request path selects
+            the view. This application renders no views: 7 @RestController classes, zero
+            @Controller, no XsltView / ModelAndView / ViewResolver, and no template engine
+            (no thymeleaf/freemarker/mustache/groovy-templates on the dependency tree).
+            Every endpoint returns JSON via @ResponseBody.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47884</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            PartEventHttpMessageReader ignores maxPartSize. Requires a WebFlux controller
+            with an @RequestBody Flux<PartEvent> argument and maxInMemorySize set to -1.
+            This is a Spring MVC application (spring-boot-starter-web, no
+            spring-boot-starter-webflux); no Flux<PartEvent> handlers exist.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47885</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            SpEL power-operator DoS on BigDecimal/BigInteger. Requires the application to
+            evaluate untrusted SpEL expressions. It evaluates no SpEL at all: no
+            ExpressionParser, SpelExpressionParser, SimpleEvaluationContext or
+            StandardEvaluationContext usage in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47886</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            RSocket memory leak via a malformed SETUP frame. Requires Spring RSocket
+            messaging (RSocketMessageHandler). This application uses no RSocket: no
+            spring-boot-starter-rsocket dependency and no RSocket types in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47888</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            sameSite attribute dropped from response cookies on the Jetty 12 Core reactive
+            adapter. Requires WebFlux deployed on Jetty 12 Core. This application is Spring
+            MVC on the default embedded Tomcat; no WebFlux and no Jetty on the dependency
+            tree. (Spring itself rates this Low; it is the NVD score that trips the gate.)
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47889</cve>
+    </suppress>
+
+    <!-- ===== Spring Security 6.5.11 (OSS fix only in 7.x / Spring Boot 4.x) ===== -->
 
     <suppress until="2026-12-31Z">
         <notes><![CDATA[
