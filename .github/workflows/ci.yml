@@ -282,11 +282,17 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: dev-secret-key-for-local-testing-must-be-at-least-32-chars
           JWT_REFRESH_SECRET: dev-refresh-secret-for-local-testing-at-least-32-chars
-          # No Redis/Kafka/Ollama service in this job -- all three degrade gracefully
-          # (see application.yml comments), but there's no need to have Ollama or the
-          # outbox relay spin trying to reach services that don't exist here.
+          # No Redis/Kafka/Ollama service in this job -- all three degrade gracefully at the
+          # application level (see application.yml comments), but Boot's default health
+          # aggregation still marks /actuator/health DOWN when Redis's auto-configured
+          # indicator can't reach it, which would otherwise fail our own readiness wait below
+          # despite the app being perfectly able to serve requests. (Kafka has no such health
+          # indicator in this actuator version -- only Redis needs disabling.) There's also
+          # no need to have Ollama or the outbox relay spin trying to reach services that
+          # don't exist here.
           OLLAMA_ENABLED: 'false'
           OUTBOX_ENABLED: 'false'
+          MANAGEMENT_HEALTH_REDIS_ENABLED: 'false'
         run: |
           nohup java -jar target/activity-tracker-*.jar > app.log 2>&1 &
           echo "Waiting for the app to come up..."
