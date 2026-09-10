@@ -66,6 +66,7 @@ describe('DashboardPage', () => {
   it('renders every card once all three calls resolve', async () => {
     const api = apiReturning({
       '/api/v1/summary/daily': summary,
+      '/api/v1/summary/weekly': summary,
       '/api/v1/activities': activitiesPage,
       '/api/v1/integrations/google-health/status': {
         connected: true,
@@ -85,6 +86,7 @@ describe('DashboardPage', () => {
   it('keeps the rest of the page usable when the summary call fails', async () => {
     const api = apiReturning({
       '/api/v1/summary/daily': new ApiError(500, { error: 'Internal error' }),
+      '/api/v1/summary/weekly': summary,
       '/api/v1/activities': activitiesPage,
       '/api/v1/integrations/google-health/status': {
         connected: false,
@@ -102,6 +104,7 @@ describe('DashboardPage', () => {
   it('shows a specific message and does not retry on 429', async () => {
     const api = apiReturning({
       '/api/v1/summary/daily': new ApiError(429, { error: 'Too many requests' }),
+      '/api/v1/summary/weekly': summary,
       '/api/v1/activities': activitiesPage,
       '/api/v1/integrations/google-health/status': {
         connected: false,
@@ -115,12 +118,13 @@ describe('DashboardPage', () => {
     await waitFor(() =>
       expect(screen.getByText(/too many requests/i)).toBeInTheDocument(),
     );
-    expect(api.get).toHaveBeenCalledTimes(3);
+    expect(api.get).toHaveBeenCalledTimes(4);
   });
 
   it('shows the empty state when the account has no activities', async () => {
     const api = apiReturning({
       '/api/v1/summary/daily': { ...summary, streakDays: 0 },
+      '/api/v1/summary/weekly': { ...summary, streakDays: 0 },
       '/api/v1/activities': { ...activitiesPage, content: [], totalElements: 0 },
       '/api/v1/integrations/google-health/status': {
         connected: false,
@@ -145,6 +149,7 @@ describe('DashboardPage', () => {
 
     const api = apiReturning({
       '/api/v1/summary/daily': summary,
+      '/api/v1/summary/weekly': summary,
       '/api/v1/activities': staleActivitiesPage,
       '/api/v1/integrations/google-health/status': {
         connected: true,
@@ -164,6 +169,7 @@ describe('DashboardPage', () => {
     const truncatedPage = { ...activitiesPage, totalElements: 150 };
     const api = apiReturning({
       '/api/v1/summary/daily': summary,
+      '/api/v1/summary/weekly': summary,
       '/api/v1/activities': truncatedPage,
       '/api/v1/integrations/google-health/status': {
         connected: false,

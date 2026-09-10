@@ -3,17 +3,48 @@ import type {
   ActivityInput,
   ActivityResponse,
   AuthResponse,
+  DigestResponse,
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
   Page,
   ProfileResponse,
   ProfileUpdateInput,
+  SummaryPeriod,
   SummaryResponse,
 } from './types';
 
 /** Today's summary in the caller's timezone. Supplies streakDays for the hero. */
 export function getDailySummary(api: ApiClient): Promise<SummaryResponse> {
   return api.get<SummaryResponse>('/api/v1/summary/daily');
+}
+
+/** Week-to-date (Monday through today) in the caller's timezone. */
+export function getWeeklySummary(api: ApiClient): Promise<SummaryResponse> {
+  return api.get<SummaryResponse>('/api/v1/summary/weekly');
+}
+
+/** Month-to-date (1st through today) in the caller's timezone. */
+export function getMonthlySummary(api: ApiClient): Promise<SummaryResponse> {
+  return api.get<SummaryResponse>('/api/v1/summary/monthly');
+}
+
+export function getSummaryFor(api: ApiClient, period: SummaryPeriod): Promise<SummaryResponse> {
+  if (period === 'daily') {
+    return getDailySummary(api);
+  }
+  if (period === 'weekly') {
+    return getWeeklySummary(api);
+  }
+  return getMonthlySummary(api);
+}
+
+/**
+ * An AI-generated natural-language recap. Never rejects on the LLM being unavailable —
+ * check `available` on the response, which already carries a human-readable fallback
+ * message in `digest` either way.
+ */
+export function getDigest(api: ApiClient, period: SummaryPeriod): Promise<DigestResponse> {
+  return api.get<DigestResponse>(`/api/v1/summary/digest?period=${period}`);
 }
 
 /**

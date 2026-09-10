@@ -309,6 +309,50 @@ body {
   border-bottom-color: currentColor;
 }
 
+.segmented {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.segmented-button {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segmented-button[aria-pressed='true'] {
+  color: inherit;
+  border-color: currentColor;
+}
+
+.breakdown-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.breakdown-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.digest-text {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .workout-list {
   list-style: none;
   margin: 0;

@@ -71,6 +71,18 @@ export interface GoogleHealthConnectResponse {
   authorizationUrl: string;
 }
 
+export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
+
+export interface DigestResponse {
+  period: string;
+  from: string;
+  to: string;
+  /** False when the LLM backing the digest is unavailable — `digest` is still a
+   *  human-readable fallback message in that case, never an error. */
+  available: boolean;
+  digest: string;
+}
+
 export interface ProfileResponse {
   id: string;
   email: string;

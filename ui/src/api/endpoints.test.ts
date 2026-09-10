@@ -5,8 +5,12 @@ import {
   deleteAccount,
   deleteActivity,
   disconnectGoogleHealth,
+  getDigest,
   getGoogleHealthConnectUrl,
+  getMonthlySummary,
   getProfile,
+  getSummaryFor,
+  getWeeklySummary,
   listAllActivities,
   login,
   register,
@@ -298,5 +302,37 @@ describe('google health integration endpoints', () => {
     await disconnectGoogleHealth(api);
 
     expect(api.del).toHaveBeenCalledWith('/api/v1/integrations/google-health');
+  });
+});
+
+describe('summary period endpoints', () => {
+  it('requests the weekly and monthly summary endpoints directly', async () => {
+    const api = spyClient();
+
+    await getWeeklySummary(api);
+    await getMonthlySummary(api);
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/api/v1/summary/weekly');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/summary/monthly');
+  });
+
+  it.each([
+    ['daily', '/api/v1/summary/daily'],
+    ['weekly', '/api/v1/summary/weekly'],
+    ['monthly', '/api/v1/summary/monthly'],
+  ] as const)('getSummaryFor(%s) hits %s', async (period, path) => {
+    const api = spyClient();
+
+    await getSummaryFor(api, period);
+
+    expect(api.get).toHaveBeenCalledWith(path);
+  });
+
+  it('requests a digest for the given period', async () => {
+    const api = spyClient();
+
+    await getDigest(api, 'monthly');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/summary/digest?period=monthly');
   });
 });
