@@ -7,6 +7,7 @@ import {
   disconnectGoogleHealth,
   getDigest,
   getGoogleHealthConnectUrl,
+  getMilestones,
   getMonthlySummary,
   getProfile,
   getSummaryFor,
@@ -377,5 +378,18 @@ describe('importFitbitCsv', () => {
     ];
     expect(path).toBe('/api/v1/activities/import/fitbit');
     expect(form.get('file')).toBe(file);
+  });
+});
+
+describe('getMilestones', () => {
+  it('requests the earned-milestones list', async () => {
+    const api = spyClient();
+    const milestones = [{ milestoneDays: 7, achievedAt: '2026-08-20T09:00:00' }];
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue(milestones);
+
+    const result = await getMilestones(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/milestones');
+    expect(result).toEqual(milestones);
   });
 });

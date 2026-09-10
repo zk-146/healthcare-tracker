@@ -73,6 +73,7 @@ describe('DashboardPage', () => {
         status: 'CONNECTED',
         lastSyncedAt: '2026-08-22T04:00:00',
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={today} />);
@@ -93,6 +94,7 @@ describe('DashboardPage', () => {
         status: null,
         lastSyncedAt: null,
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={today} />);
@@ -111,6 +113,7 @@ describe('DashboardPage', () => {
         status: null,
         lastSyncedAt: null,
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={today} />);
@@ -118,7 +121,7 @@ describe('DashboardPage', () => {
     await waitFor(() =>
       expect(screen.getByText(/too many requests/i)).toBeInTheDocument(),
     );
-    expect(api.get).toHaveBeenCalledTimes(4);
+    expect(api.get).toHaveBeenCalledTimes(5);
   });
 
   it('shows the empty state when the account has no activities', async () => {
@@ -131,6 +134,7 @@ describe('DashboardPage', () => {
         status: null,
         lastSyncedAt: null,
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={today} />);
@@ -156,6 +160,7 @@ describe('DashboardPage', () => {
         status: 'CONNECTED',
         lastSyncedAt: '2026-08-22T04:00:00',
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={farFutureToday} />);
@@ -176,6 +181,7 @@ describe('DashboardPage', () => {
         status: null,
         lastSyncedAt: null,
       },
+      '/api/v1/milestones': [],
     });
 
     render(<DashboardPage api={api} today={today} />);

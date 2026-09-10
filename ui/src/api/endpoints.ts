@@ -8,6 +8,7 @@ import type {
   DigestResponse,
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
+  MilestoneResponse,
   Page,
   ProfileResponse,
   ProfileUpdateInput,
@@ -253,6 +254,11 @@ export function importFitbitCsv(api: ApiClient, file: File): Promise<CsvImportRe
   const form = new FormData();
   form.append('file', file);
   return api.postForm<CsvImportResponse>('/api/v1/activities/import/fitbit', form);
+}
+
+/** Every streak milestone the caller has earned, longest streak first. */
+export function getMilestones(api: ApiClient): Promise<MilestoneResponse[]> {
+  return api.get<MilestoneResponse[]>('/api/v1/milestones');
 }
 
 export function getProfile(api: ApiClient): Promise<ProfileResponse> {

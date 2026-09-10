@@ -2,8 +2,11 @@
  * Mirrors MILESTONE_THRESHOLDS in
  * src/main/java/com/healthcare/activitytracker/service/ActivityEventConsumer.java:37
  *
- * This is knowingly a second source of truth. Nothing exposes the ladder over HTTP
- * and StreakMilestone has no controller. Keep in sync until GET /api/v1/milestones exists.
+ * This is knowingly a second source of truth. GET /api/v1/milestones (see
+ * api/endpoints.ts's getMilestones) reports what the user has already earned, but
+ * nothing over HTTP reports the full ladder — StreakHero needs to know the *next*
+ * (unearned) threshold too, which by definition has no row in that response. Keep
+ * this list in sync with the backend's.
  */
 export const MILESTONE_THRESHOLDS = [3, 7, 14, 30, 60, 100, 365] as const;
 
