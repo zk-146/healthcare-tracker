@@ -19,6 +19,10 @@ regexes = [
   '''dev-refresh-secret-for-local-testing-at-least-32-chars''',
   '''redis-local-dev-password''',
   '''change-me-token-encryption-key''',
+  # scripts/sonar-scan.sh:96 -- `curl -u "$SONAR_TOKEN:"` passes the token via a shell
+  # variable, not a hardcoded credential. The default curl-auth-user rule flags any
+  # `curl -u <value>` regardless of whether <value> is a literal or a variable reference.
+  '''\$SONAR_TOKEN:?''',
 ]
 paths = [
   # Test fixtures intentionally use fake keys/tokens to exercise the JWT/OAuth code paths.

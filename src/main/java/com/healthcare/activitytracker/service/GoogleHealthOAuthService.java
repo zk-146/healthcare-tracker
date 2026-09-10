@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -45,6 +46,10 @@ public class GoogleHealthOAuthService {
   private final ConcurrentHashMap<String, StateEntry> stateToUser = new ConcurrentHashMap<>();
   private final LongSupplier nowMs;
 
+  // With two declared constructors and neither a no-arg nor a Kotlin-style primary constructor,
+  // Spring can't infer which one to wire without this: it would otherwise fail bean creation
+  // with "No default constructor found".
+  @Autowired
   public GoogleHealthOAuthService(GoogleHealthProperties properties, ObjectMapper objectMapper) {
     this(properties, objectMapper, System::currentTimeMillis);
   }
