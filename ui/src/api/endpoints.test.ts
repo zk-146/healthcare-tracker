@@ -4,9 +4,11 @@ import {
   createActivity,
   deleteActivity,
   listAllActivities,
+  login,
+  register,
   updateActivity,
 } from './endpoints';
-import type { ActivityInput, ActivityResponse } from './types';
+import type { ActivityInput, ActivityResponse, AuthResponse } from './types';
 
 function spyClient(): ApiClient {
   return {
@@ -168,5 +170,66 @@ describe('activity write endpoints', () => {
     expect(api.get).toHaveBeenCalledWith(
       '/api/v1/activities?page=2&size=20&sort=startedAt%2Cdesc',
     );
+  });
+});
+
+const auth: AuthResponse = {
+  token: 'access-token',
+  refreshToken: 'refresh-token',
+  expiresIn: 900,
+  userId: 'u1',
+  email: 'ada@example.com',
+};
+
+function fetchStub(status: number, body: unknown) {
+  return vi.fn().mockResolvedValue({
+    ok: status < 400,
+    status,
+    json: () => Promise.resolve(body),
+  });
+}
+
+describe('unauthenticated auth endpoints', () => {
+  it('posts login credentials with the timezone header, no bearer token', async () => {
+    const fetchImpl = fetchStub(200, auth);
+
+    const result = await login('ada@example.com', 'hunter2', fetchImpl as unknown as typeof fetch);
+
+    expect(result).toEqual(auth);
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/login');
+    expect(JSON.parse(init.body as string)).toEqual({ email: 'ada@example.com', password: 'hunter2' });
+    const headers = init.headers as Record<string, string>;
+    expect(headers['X-User-Timezone']).toBeTruthy();
+    expect(headers.Authorization).toBeUndefined();
+  });
+
+  it('posts registration details and returns the token pair', async () => {
+    const fetchImpl = fetchStub(201, auth);
+
+    const result = await register(
+      'ada@example.com',
+      'Sup3r-Secret!',
+      'Ada Lovelace',
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual(auth);
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/register');
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: 'ada@example.com',
+      password: 'Sup3r-Secret!',
+      fullName: 'Ada Lovelace',
+    });
+  });
+
+  it('throws an ApiError carrying the response body on failure', async () => {
+    const details = { email: 'Email already registered' };
+    const fetchImpl = fetchStub(409, { error: 'Conflict', details });
+
+    await expect(
+      register('ada@example.com', 'Sup3r-Secret!', 'Ada Lovelace', fetchImpl as unknown as typeof fetch),
+    ).rejects.toMatchObject({ status: 409, body: { error: 'Conflict', details } });
   });
 });
