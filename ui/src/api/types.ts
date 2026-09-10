@@ -142,6 +142,14 @@ export interface ApiErrorBody {
  * endedAt and durationMinutes to agree when both are present, and the form only
  * collects duration.
  */
+/** Optional filters for GET /activities, all applied server-side and combinable. */
+export interface ActivityFilters {
+  activityType?: ActivityType;
+  /** Inclusive, "YYYY-MM-DD". */
+  from?: string;
+  to?: string;
+}
+
 export interface ActivityInput {
   activityType: ActivityType;
   /** Zoneless LocalDateTime, "YYYY-MM-DDTHH:mm:ss". */

@@ -182,6 +182,30 @@ describe('activity write endpoints', () => {
       '/api/v1/activities?page=2&size=20&sort=startedAt%2Cdesc',
     );
   });
+
+  it('includes only the filters that were supplied', async () => {
+    const api = spyClient();
+
+    await listAllActivities(api, 0, { activityType: 'RUNNING' });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/activities?page=0&size=20&sort=startedAt%2Cdesc&activityType=RUNNING',
+    );
+  });
+
+  it('combines the type and date-range filters', async () => {
+    const api = spyClient();
+
+    await listAllActivities(api, 0, {
+      activityType: 'YOGA',
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/activities?page=0&size=20&sort=startedAt%2Cdesc&activityType=YOGA&from=2026-08-01&to=2026-08-31',
+    );
+  });
 });
 
 const auth: AuthResponse = {
