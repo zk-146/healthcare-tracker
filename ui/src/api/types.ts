@@ -71,6 +71,13 @@ export interface GoogleHealthConnectResponse {
   authorizationUrl: string;
 }
 
+/** A streak milestone the user has already earned. */
+export interface MilestoneResponse {
+  milestoneDays: number;
+  /** Zoneless LocalDateTime. */
+  achievedAt: string;
+}
+
 export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
 
 /** Response to a Fitbit dailyActivity_merged.csv import. */

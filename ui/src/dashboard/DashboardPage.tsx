@@ -8,6 +8,7 @@ import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
 import { FreshnessCard } from './FreshnessCard';
 import { LatestDayCard } from './LatestDayCard';
+import { MilestonesCard } from './MilestonesCard';
 import { RecentDaysList } from './RecentDaysList';
 import { SevenDayChart } from './SevenDayChart';
 import { StreakHero } from './StreakHero';
@@ -67,6 +68,8 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
       {summary.state === 'loading' && <Skeleton height={150} />}
       {summary.state === 'error' && <ErrorNote message={summary.message} />}
       {summary.state === 'ready' && <StreakHero streakDays={summary.value.streakDays} />}
+
+      <MilestonesCard api={api} />
 
       {activities.state === 'loading' && <Skeleton height={110} />}
       {activities.state === 'error' && <ErrorNote message={activities.message} />}
