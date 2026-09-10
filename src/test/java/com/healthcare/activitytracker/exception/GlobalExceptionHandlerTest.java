@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTest {
@@ -192,6 +193,29 @@ class GlobalExceptionHandlerTest {
 
   @SuppressWarnings("unused")
   private static void dummyTarget(Integer limit) {}
+
+  @Test
+  void handleResponseStatus_returnsTheExceptionsOwnStatusAndReason() {
+    ResponseStatusException ex =
+        new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE, "Google Health integration is disabled");
+
+    ResponseEntity<Map<String, Object>> response = handler.handleResponseStatus(ex);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    assertThat(response.getBody())
+        .containsEntry("error", "Google Health integration is disabled");
+  }
+
+  @Test
+  void handleResponseStatus_fallsBackTo500ForAnUnresolvableStatusCode() {
+    ResponseStatusException ex =
+        new ResponseStatusException(org.springframework.http.HttpStatusCode.valueOf(599), "odd");
+
+    ResponseEntity<Map<String, Object>> response = handler.handleResponseStatus(ex);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+  }
 
   @Test
   void handleNoResourceFound_returns404() {
