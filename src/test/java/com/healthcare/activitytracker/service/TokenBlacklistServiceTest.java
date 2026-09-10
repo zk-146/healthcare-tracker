@@ -48,7 +48,8 @@ class TokenBlacklistServiceTest {
 
     service.revoke("token-a", 60_000);
 
-    verify(valueOps).set(anyString(), org.mockito.ArgumentMatchers.eq("revoked"), any(Duration.class));
+    verify(valueOps)
+        .set(anyString(), org.mockito.ArgumentMatchers.eq("revoked"), any(Duration.class));
   }
 
   @Test

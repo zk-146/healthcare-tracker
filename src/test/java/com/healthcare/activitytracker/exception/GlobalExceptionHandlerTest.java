@@ -173,8 +173,7 @@ class GlobalExceptionHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody())
-        .containsEntry(
-            "error", "Parameter 'limit' has an invalid value; expected type Integer");
+        .containsEntry("error", "Parameter 'limit' has an invalid value; expected type Integer");
   }
 
   @Test
@@ -203,8 +202,7 @@ class GlobalExceptionHandlerTest {
     ResponseEntity<Map<String, Object>> response = handler.handleResponseStatus(ex);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-    assertThat(response.getBody())
-        .containsEntry("error", "Google Health integration is disabled");
+    assertThat(response.getBody()).containsEntry("error", "Google Health integration is disabled");
   }
 
   @Test

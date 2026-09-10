@@ -1,7 +1,5 @@
 package com.healthcare.activitytracker.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -73,7 +71,8 @@ class GoogleHealthIntegrationControllerTest {
     when(properties.isEnabled()).thenReturn(false);
 
     mockMvc
-        .perform(get("/api/v1/integrations/google-health/connect").with(uuidUser(UUID.randomUUID())))
+        .perform(
+            get("/api/v1/integrations/google-health/connect").with(uuidUser(UUID.randomUUID())))
         .andExpect(status().isServiceUnavailable());
   }
 
@@ -106,8 +105,7 @@ class GoogleHealthIntegrationControllerTest {
     when(properties.isEnabled()).thenReturn(true);
 
     mockMvc
-        .perform(
-            get("/api/v1/integrations/google-health/callback").param("error", "access_denied"))
+        .perform(get("/api/v1/integrations/google-health/callback").param("error", "access_denied"))
         .andExpect(status().isBadRequest())
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
