@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from './client';
 import {
   createActivity,
+  deleteAccount,
   deleteActivity,
+  getProfile,
   listAllActivities,
   login,
   register,
   updateActivity,
+  updateProfile,
 } from './endpoints';
-import type { ActivityInput, ActivityResponse, AuthResponse } from './types';
+import type { ActivityInput, ActivityResponse, AuthResponse, ProfileResponse } from './types';
 
 function spyClient(): ApiClient {
   return {
@@ -231,5 +234,45 @@ describe('unauthenticated auth endpoints', () => {
     await expect(
       register('ada@example.com', 'Sup3r-Secret!', 'Ada Lovelace', fetchImpl as unknown as typeof fetch),
     ).rejects.toMatchObject({ status: 409, body: { error: 'Conflict', details } });
+  });
+});
+
+const profile: ProfileResponse = {
+  id: 'u1',
+  email: 'ada@example.com',
+  fullName: 'Ada Lovelace',
+  dateOfBirth: '1990-01-01',
+  gender: 'female',
+  heightCm: 170,
+  weightKg: 62,
+  createdAt: '2026-01-01T00:00:00',
+  updatedAt: '2026-01-01T00:00:00',
+};
+
+describe('profile endpoints', () => {
+  it('fetches the current profile', async () => {
+    const api = spyClient();
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue(profile);
+
+    const result = await getProfile(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/profile');
+    expect(result).toEqual(profile);
+  });
+
+  it('puts a partial update as given, without inventing fields', async () => {
+    const api = spyClient();
+
+    await updateProfile(api, { fullName: 'Ada K. Lovelace' });
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/profile', { fullName: 'Ada K. Lovelace' });
+  });
+
+  it('deletes the account', async () => {
+    const api = spyClient();
+
+    await deleteAccount(api);
+
+    expect(api.del).toHaveBeenCalledWith('/api/v1/profile');
   });
 });

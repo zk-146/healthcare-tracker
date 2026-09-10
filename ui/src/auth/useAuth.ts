@@ -13,6 +13,11 @@ export interface AuthState {
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string, fullName: string): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * Drops the local session without calling the logout endpoint. For callers that
+   * have already invalidated the token server-side another way (account deletion).
+   */
+  clearSession(): void;
 }
 
 export function useAuth(): AuthState {
@@ -48,5 +53,10 @@ export function useAuth(): AuthState {
     }
   }, [api]);
 
-  return { api, isAuthenticated, signIn, signUp, signOut };
+  const clearSession = useCallback(() => {
+    localTokenStore.clear();
+    setAuthenticated(false);
+  }, []);
+
+  return { api, isAuthenticated, signIn, signUp, signOut, clearSession };
 }
