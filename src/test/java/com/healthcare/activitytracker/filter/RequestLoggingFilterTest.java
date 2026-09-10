@@ -64,8 +64,7 @@ class RequestLoggingFilterTest {
     when(response.getStatus()).thenReturn(200);
 
     String[] requestIdDuringChain = new String[1];
-    FilterChain chain =
-        (req, res) -> requestIdDuringChain[0] = MDC.get("requestId");
+    FilterChain chain = (req, res) -> requestIdDuringChain[0] = MDC.get("requestId");
 
     filter.doFilterInternal(request, response, chain);
 
