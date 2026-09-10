@@ -90,7 +90,13 @@ export function App() {
           onImportClose={() => setImportOpen(false)}
         />
       )}
-      {view === 'profile' && <ProfilePage api={api} onAccountDeleted={clearSession} />}
+      {view === 'profile' && (
+        <ProfilePage
+          api={api}
+          onAccountDeleted={clearSession}
+          onPasswordChanged={() => void signOut()}
+        />
+      )}
     </main>
   );
 }

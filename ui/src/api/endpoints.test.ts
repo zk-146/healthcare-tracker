@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from './client';
 import {
+  changePassword,
   createActivity,
   deleteAccount,
   deleteActivity,
@@ -224,6 +225,19 @@ function fetchStub(status: number, body: unknown) {
     json: () => Promise.resolve(body),
   });
 }
+
+describe('changePassword', () => {
+  it('posts current and new password to the authenticated client', async () => {
+    const api = spyClient();
+
+    await changePassword(api, 'OldPassw0rd!', 'NewPassw0rd!');
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/auth/change-password', {
+      currentPassword: 'OldPassw0rd!',
+      newPassword: 'NewPassw0rd!',
+    });
+  });
+});
 
 describe('unauthenticated auth endpoints', () => {
   it('posts login credentials with the timezone header, no bearer token', async () => {
