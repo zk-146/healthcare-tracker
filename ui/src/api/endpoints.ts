@@ -30,32 +30,54 @@ export function getSyncStatus(api: ApiClient): Promise<GoogleHealthStatusRespons
   return api.get<GoogleHealthStatusResponse>('/api/v1/integrations/google-health/status');
 }
 
-/** Login runs before any token exists, so it bypasses the authenticated client. */
-export async function login(
-  email: string,
-  password: string,
-  fetchImpl: typeof fetch = fetch,
+/** Shared by login and register — neither has a token yet, so both bypass the ApiClient. */
+async function unauthenticatedPost(
+  path: string,
+  body: unknown,
+  fetchImpl: typeof fetch,
 ): Promise<AuthResponse> {
   // Global constraint: every API call sends X-User-Timezone, including pre-auth calls.
   // Do not simplify this back to a bare Content-Type header.
-  const response = await fetchImpl('/api/v1/auth/login', {
+  const response = await fetchImpl(path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-User-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
-    let body = null;
+    let errorBody = null;
     try {
-      body = await response.json();
+      errorBody = await response.json();
     } catch {
-      body = null;
+      errorBody = null;
     }
-    throw new ApiError(response.status, body);
+    throw new ApiError(response.status, errorBody);
   }
   return (await response.json()) as AuthResponse;
+}
+
+/** Login runs before any token exists, so it bypasses the authenticated client. */
+export function login(
+  email: string,
+  password: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthResponse> {
+  return unauthenticatedPost('/api/v1/auth/login', { email, password }, fetchImpl);
+}
+
+/**
+ * Registers a new account and returns the same token pair as login, so the caller can
+ * sign the user straight in without a second round trip.
+ */
+export function register(
+  email: string,
+  password: string,
+  fullName: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthResponse> {
+  return unauthenticatedPost('/api/v1/auth/register', { email, password, fullName }, fetchImpl);
 }
 
 /** Blacklists the access token server-side rather than merely discarding it. */

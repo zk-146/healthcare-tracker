@@ -1,15 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
 const signOut = vi.fn().mockResolvedValue(undefined);
+let isAuthenticated = true;
 
 vi.mock('./auth/useAuth', () => ({
   useAuth: () => ({
     api: {},
-    isAuthenticated: true,
+    isAuthenticated,
     signIn: vi.fn(),
+    signUp: vi.fn(),
     signOut,
   }),
 }));
@@ -25,6 +27,10 @@ vi.mock('./workouts/WorkoutsPage', () => ({
 }));
 
 describe('App shell', () => {
+  beforeEach(() => {
+    isAuthenticated = true;
+  });
+
   it('starts on the Activity tab', () => {
     render(<App />);
 
@@ -61,5 +67,24 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(signOut).toHaveBeenCalled();
+  });
+});
+
+describe('App shell (signed out)', () => {
+  beforeEach(() => {
+    isAuthenticated = false;
+  });
+
+  it('shows the login form and switches to registration and back', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /create an account/i }));
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /already have an account/i }));
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });

@@ -2,9 +2,10 @@ import { useState, type FormEvent } from 'react';
 
 interface LoginPageProps {
   onSubmit(email: string, password: string): Promise<void>;
+  onSwitchToRegister(): void;
 }
 
-export function LoginPage({ onSubmit }: LoginPageProps) {
+export function LoginPage({ onSubmit, onSwitchToRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,10 @@ export function LoginPage({ onSubmit }: LoginPageProps) {
 
         <button type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
+        </button>
+
+        <button type="button" className="link-button" onClick={onSwitchToRegister} disabled={busy}>
+          New here? Create an account
         </button>
       </form>
     </main>

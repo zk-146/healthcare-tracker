@@ -1,18 +1,25 @@
 import { useState } from 'react';
 import { useAuth } from './auth/useAuth';
 import { LoginPage } from './auth/LoginPage';
+import { RegisterPage } from './auth/RegisterPage';
 import { DashboardPage } from './dashboard/DashboardPage';
 import { WorkoutsPage } from './workouts/WorkoutsPage';
 
 type View = 'activity' | 'workouts';
+type AuthView = 'login' | 'register';
 
 export function App() {
-  const { api, isAuthenticated, signIn, signOut } = useAuth();
+  const { api, isAuthenticated, signIn, signUp, signOut } = useAuth();
   const [view, setView] = useState<View>('activity');
   const [createOpen, setCreateOpen] = useState(false);
+  const [authView, setAuthView] = useState<AuthView>('login');
 
   if (!isAuthenticated) {
-    return <LoginPage onSubmit={signIn} />;
+    return authView === 'login' ? (
+      <LoginPage onSubmit={signIn} onSwitchToRegister={() => setAuthView('register')} />
+    ) : (
+      <RegisterPage onSubmit={signUp} onSwitchToLogin={() => setAuthView('login')} />
+    );
   }
 
   return (
