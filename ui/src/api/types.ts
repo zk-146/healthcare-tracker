@@ -67,6 +67,10 @@ export interface GoogleHealthStatusResponse {
   lastSyncedAt: string | null;
 }
 
+export interface GoogleHealthConnectResponse {
+  authorizationUrl: string;
+}
+
 export interface ProfileResponse {
   id: string;
   email: string;

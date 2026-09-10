@@ -3,6 +3,7 @@ import type {
   ActivityInput,
   ActivityResponse,
   AuthResponse,
+  GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
   Page,
   ProfileResponse,
@@ -30,6 +31,19 @@ export function listActivities(
 
 export function getSyncStatus(api: ApiClient): Promise<GoogleHealthStatusResponse> {
   return api.get<GoogleHealthStatusResponse>('/api/v1/integrations/google-health/status');
+}
+
+/**
+ * Starts the link flow: the caller opens the returned URL in a browser tab, approves
+ * access with Google, and is redirected to the backend's (non-SPA) callback page. There
+ * is nothing to await here beyond getting that URL — completion is out of band.
+ */
+export function getGoogleHealthConnectUrl(api: ApiClient): Promise<GoogleHealthConnectResponse> {
+  return api.get<GoogleHealthConnectResponse>('/api/v1/integrations/google-health/connect');
+}
+
+export function disconnectGoogleHealth(api: ApiClient): Promise<void> {
+  return api.del<void>('/api/v1/integrations/google-health');
 }
 
 /** Shared by login and register — neither has a token yet, so both bypass the ApiClient. */

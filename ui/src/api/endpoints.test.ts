@@ -4,6 +4,8 @@ import {
   createActivity,
   deleteAccount,
   deleteActivity,
+  disconnectGoogleHealth,
+  getGoogleHealthConnectUrl,
   getProfile,
   listAllActivities,
   login,
@@ -274,5 +276,27 @@ describe('profile endpoints', () => {
     await deleteAccount(api);
 
     expect(api.del).toHaveBeenCalledWith('/api/v1/profile');
+  });
+});
+
+describe('google health integration endpoints', () => {
+  it('fetches the authorization URL to start the connect flow', async () => {
+    const api = spyClient();
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      authorizationUrl: 'https://accounts.google.com/auth',
+    });
+
+    const result = await getGoogleHealthConnectUrl(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/integrations/google-health/connect');
+    expect(result).toEqual({ authorizationUrl: 'https://accounts.google.com/auth' });
+  });
+
+  it('disconnects the integration', async () => {
+    const api = spyClient();
+
+    await disconnectGoogleHealth(api);
+
+    expect(api.del).toHaveBeenCalledWith('/api/v1/integrations/google-health');
   });
 });
