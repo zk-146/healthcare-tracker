@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
 const signOut = vi.fn().mockResolvedValue(undefined);
+const clearSession = vi.fn();
 let isAuthenticated = true;
 
 vi.mock('./auth/useAuth', () => ({
@@ -13,6 +14,7 @@ vi.mock('./auth/useAuth', () => ({
     signIn: vi.fn(),
     signUp: vi.fn(),
     signOut,
+    clearSession,
   }),
 }));
 
@@ -23,6 +25,17 @@ vi.mock('./dashboard/DashboardPage', () => ({
 vi.mock('./workouts/WorkoutsPage', () => ({
   WorkoutsPage: ({ createOpen }: { createOpen: boolean }) => (
     <div>workouts stub {createOpen ? 'creating' : 'idle'}</div>
+  ),
+}));
+
+vi.mock('./profile/ProfilePage', () => ({
+  ProfilePage: ({ onAccountDeleted }: { onAccountDeleted: () => void }) => (
+    <div>
+      profile stub
+      <button type="button" onClick={onAccountDeleted}>
+        stub delete
+      </button>
+    </div>
   ),
 }));
 
@@ -67,6 +80,17 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(signOut).toHaveBeenCalled();
+  });
+
+  it('swaps to the Profile tab and clears the session on account deletion', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: 'Profile' }));
+    expect(screen.getByText(/profile stub/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'stub delete' }));
+    expect(clearSession).toHaveBeenCalled();
   });
 });
 

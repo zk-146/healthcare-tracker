@@ -67,6 +67,32 @@ export interface GoogleHealthStatusResponse {
   lastSyncedAt: string | null;
 }
 
+export interface ProfileResponse {
+  id: string;
+  email: string;
+  fullName: string;
+  /** LocalDate, "YYYY-MM-DD". */
+  dateOfBirth: string | null;
+  gender: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * The backend's PUT is a partial update — a field left out of the body is left
+ * unchanged, unlike ActivityRequest's full-replace semantics. There is no way to
+ * clear a field back to null through this endpoint.
+ */
+export interface ProfileUpdateInput {
+  fullName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  heightCm?: number;
+  weightKg?: number;
+}
+
 export interface Page<T> {
   content: T[];
   totalElements: number;

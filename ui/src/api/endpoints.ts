@@ -5,6 +5,8 @@ import type {
   AuthResponse,
   GoogleHealthStatusResponse,
   Page,
+  ProfileResponse,
+  ProfileUpdateInput,
   SummaryResponse,
 } from './types';
 
@@ -183,4 +185,24 @@ export function listAllActivities(api: ApiClient, page: number): Promise<Page<Ac
     sort: 'startedAt,desc',
   });
   return api.get<Page<ActivityResponse>>(`/api/v1/activities?${params.toString()}`);
+}
+
+export function getProfile(api: ApiClient): Promise<ProfileResponse> {
+  return api.get<ProfileResponse>('/api/v1/profile');
+}
+
+export function updateProfile(
+  api: ApiClient,
+  input: ProfileUpdateInput,
+): Promise<ProfileResponse> {
+  return api.put<ProfileResponse>('/api/v1/profile', input);
+}
+
+/**
+ * Irreversible: deletes the account and all its data server-side. The caller is
+ * responsible for clearing the local session afterwards — this call alone leaves
+ * the (now-revoked) access token sitting in storage.
+ */
+export function deleteAccount(api: ApiClient): Promise<void> {
+  return api.del<void>('/api/v1/profile');
 }

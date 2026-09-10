@@ -197,6 +197,18 @@ body {
   font-size: 14px;
 }
 
+.profile-email {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.saved-note {
+  margin: 0 0 12px;
+  color: var(--success, var(--muted));
+  font-size: 13px;
+}
+
 .login {
   max-width: 360px;
   margin: 15vh auto 0;
