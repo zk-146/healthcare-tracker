@@ -41,8 +41,7 @@ class MilestoneControllerTest {
 
   private static RequestPostProcessor uuidUser() {
     Authentication auth =
-        new UsernamePasswordAuthenticationToken(
-            UUID.randomUUID(), null, Collections.emptyList());
+        new UsernamePasswordAuthenticationToken(UUID.randomUUID(), null, Collections.emptyList());
     return authentication(auth);
   }
 
