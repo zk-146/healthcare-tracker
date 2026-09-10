@@ -27,6 +27,12 @@ export interface ApiClient {
   put<T>(path: string, body?: unknown): Promise<T>;
   /** Named `del` because `delete` is a reserved word. */
   del<T>(path: string): Promise<T>;
+  /**
+   * Multipart upload (file imports). Distinct from `post` because a FormData body must
+   * NOT get a hand-set Content-Type: the browser derives one with the multipart
+   * boundary, and overriding it (as `post`'s JSON path does) breaks the upload.
+   */
+  postForm<T>(path: string, form: FormData): Promise<T>;
 }
 
 async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
@@ -63,7 +69,7 @@ export function createApiClient(
     if (tokens !== null) {
       headers.set('Authorization', `Bearer ${tokens.token}`);
     }
-    if (init.body !== undefined) {
+    if (init.body !== undefined && !(init.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json');
     }
     return fetchImpl(path, { ...init, headers });
@@ -153,6 +159,9 @@ export function createApiClient(
     },
     del<T>(path: string) {
       return request<T>(path, { method: 'DELETE' });
+    },
+    postForm<T>(path: string, form: FormData) {
+      return request<T>(path, { method: 'POST', body: form });
     },
   };
 }

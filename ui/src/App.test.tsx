@@ -23,8 +23,10 @@ vi.mock('./dashboard/DashboardPage', () => ({
 }));
 
 vi.mock('./workouts/WorkoutsPage', () => ({
-  WorkoutsPage: ({ createOpen }: { createOpen: boolean }) => (
-    <div>workouts stub {createOpen ? 'creating' : 'idle'}</div>
+  WorkoutsPage: ({ createOpen, importOpen }: { createOpen: boolean; importOpen: boolean }) => (
+    <div>
+      workouts stub {createOpen ? 'creating' : 'idle'} {importOpen ? 'importing' : 'not-importing'}
+    </div>
   ),
 }));
 
@@ -71,6 +73,18 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: '＋ Log workout' }));
 
     expect(screen.getByText(/workouts stub creating/)).toBeInTheDocument();
+  });
+
+  it('shows the import-CSV trigger only on the Workouts tab, and it opens the dialog', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.queryByRole('button', { name: 'Import CSV' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Workouts' }));
+    await user.click(screen.getByRole('button', { name: 'Import CSV' }));
+
+    expect(screen.getByText(/workouts stub idle importing/)).toBeInTheDocument();
   });
 
   it('signs out from the shared header', async () => {

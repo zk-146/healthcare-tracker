@@ -7,6 +7,7 @@ import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { ImportCsvDialog } from './ImportCsvDialog';
 import { TYPE_LABELS, WorkoutForm } from './WorkoutForm';
 
 /** MANUAL rows carry no badge: that is the default and would be noise on every row. */
@@ -46,12 +47,20 @@ function metricOf(activity: ActivityResponse): string | null {
 
 interface WorkoutsPageProps {
   api: ApiClient;
-  /** Owned by App, because the trigger button lives in the shared header. */
+  /** Owned by App, because the trigger buttons live in the shared header. */
   createOpen: boolean;
   onCreateClose(): void;
+  importOpen: boolean;
+  onImportClose(): void;
 }
 
-export function WorkoutsPage({ api, createOpen, onCreateClose }: WorkoutsPageProps) {
+export function WorkoutsPage({
+  api,
+  createOpen,
+  onCreateClose,
+  importOpen,
+  onImportClose,
+}: WorkoutsPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [rows, setRows] = useState<ActivityResponse[]>([]);
   const [page, setPage] = useState(0);
@@ -159,6 +168,10 @@ export function WorkoutsPage({ api, createOpen, onCreateClose }: WorkoutsPagePro
           onClose={() => setEditing(null)}
           onSaved={refetch}
         />
+      )}
+
+      {importOpen && (
+        <ImportCsvDialog api={api} onClose={onImportClose} onImported={refetch} />
       )}
     </>
   );

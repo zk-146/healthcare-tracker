@@ -11,6 +11,7 @@ import {
   getProfile,
   getSummaryFor,
   getWeeklySummary,
+  importFitbitCsv,
   listAllActivities,
   login,
   register,
@@ -25,6 +26,7 @@ function spyClient(): ApiClient {
     post: vi.fn().mockResolvedValue({}),
     put: vi.fn().mockResolvedValue({}),
     del: vi.fn().mockResolvedValue(undefined),
+    postForm: vi.fn().mockResolvedValue({}),
   } as unknown as ApiClient;
 }
 
@@ -334,5 +336,22 @@ describe('summary period endpoints', () => {
     await getDigest(api, 'monthly');
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/summary/digest?period=monthly');
+  });
+});
+
+describe('importFitbitCsv', () => {
+  it('posts the file as multipart form data under the "file" field', async () => {
+    const api = spyClient();
+    const file = new File(['a,b\n1,2'], 'dailyActivity_merged.csv', { type: 'text/csv' });
+
+    await importFitbitCsv(api, file);
+
+    expect(api.postForm).toHaveBeenCalledTimes(1);
+    const [path, form] = (api.postForm as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      FormData,
+    ];
+    expect(path).toBe('/api/v1/activities/import/fitbit');
+    expect(form.get('file')).toBe(file);
   });
 });

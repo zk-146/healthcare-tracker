@@ -13,6 +13,7 @@ export function App() {
   const { api, isAuthenticated, signIn, signUp, signOut, clearSession } = useAuth();
   const [view, setView] = useState<View>('activity');
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [authView, setAuthView] = useState<AuthView>('login');
 
   if (!isAuthenticated) {
@@ -29,9 +30,14 @@ export function App() {
         <h1 className="app-title">Activity Tracker</h1>
         <div className="app-header-actions">
           {view === 'workouts' && (
-            <button type="button" className="link-button" onClick={() => setCreateOpen(true)}>
-              ＋ Log workout
-            </button>
+            <>
+              <button type="button" className="link-button" onClick={() => setImportOpen(true)}>
+                Import CSV
+              </button>
+              <button type="button" className="link-button" onClick={() => setCreateOpen(true)}>
+                ＋ Log workout
+              </button>
+            </>
           )}
           <button type="button" className="link-button" onClick={() => void signOut()}>
             Sign out
@@ -80,6 +86,8 @@ export function App() {
           api={api}
           createOpen={createOpen}
           onCreateClose={() => setCreateOpen(false)}
+          importOpen={importOpen}
+          onImportClose={() => setImportOpen(false)}
         />
       )}
       {view === 'profile' && <ProfilePage api={api} onAccountDeleted={clearSession} />}
