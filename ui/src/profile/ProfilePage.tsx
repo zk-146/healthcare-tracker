@@ -7,6 +7,7 @@ import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { ChangePasswordCard } from './ChangePasswordCard';
 import { draftFrom, validateDraft, type FieldErrors, type ProfileDraft } from './validate';
 
 const CONFLICT_MESSAGE = 'Your profile changed elsewhere. Reload the page and try again.';
@@ -60,11 +61,12 @@ interface ProfileFormProps {
   api: ApiClient;
   profile: ProfileResponse;
   onDeleted(): void;
+  onPasswordChanged(): void;
   /** Injectable for tests; defaults to now. */
   now?: Date;
 }
 
-function ProfileForm({ api, profile, onDeleted, now = new Date() }: ProfileFormProps) {
+function ProfileForm({ api, profile, onDeleted, onPasswordChanged, now = new Date() }: ProfileFormProps) {
   const [current, setCurrent] = useState(profile);
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFrom(profile));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -196,6 +198,8 @@ function ProfileForm({ api, profile, onDeleted, now = new Date() }: ProfileFormP
         </form>
       </Card>
 
+      <ChangePasswordCard api={api} onChanged={onPasswordChanged} />
+
       <Card title="Delete account">
         <p className="empty-note">
           Permanently deletes your account and all your workouts. This cannot be undone.
@@ -238,9 +242,10 @@ function ProfileForm({ api, profile, onDeleted, now = new Date() }: ProfileFormP
 interface ProfilePageProps {
   api: ApiClient;
   onAccountDeleted(): void;
+  onPasswordChanged(): void;
 }
 
-export function ProfilePage({ api, onAccountDeleted }: ProfilePageProps) {
+export function ProfilePage({ api, onAccountDeleted, onPasswordChanged }: ProfilePageProps) {
   const profile = useLoadable<ProfileResponse>(() => getProfile(api), [api]);
 
   return (
@@ -248,7 +253,12 @@ export function ProfilePage({ api, onAccountDeleted }: ProfilePageProps) {
       {profile.state === 'loading' && <Skeleton height={320} />}
       {profile.state === 'error' && <ErrorNote message={profile.message} />}
       {profile.state === 'ready' && (
-        <ProfileForm api={api} profile={profile.value} onDeleted={onAccountDeleted} />
+        <ProfileForm
+          api={api}
+          profile={profile.value}
+          onDeleted={onAccountDeleted}
+          onPasswordChanged={onPasswordChanged}
+        />
       )}
     </>
   );

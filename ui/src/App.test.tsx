@@ -31,11 +31,20 @@ vi.mock('./workouts/WorkoutsPage', () => ({
 }));
 
 vi.mock('./profile/ProfilePage', () => ({
-  ProfilePage: ({ onAccountDeleted }: { onAccountDeleted: () => void }) => (
+  ProfilePage: ({
+    onAccountDeleted,
+    onPasswordChanged,
+  }: {
+    onAccountDeleted: () => void;
+    onPasswordChanged: () => void;
+  }) => (
     <div>
       profile stub
       <button type="button" onClick={onAccountDeleted}>
         stub delete
+      </button>
+      <button type="button" onClick={onPasswordChanged}>
+        stub password change
       </button>
     </div>
   ),
@@ -105,6 +114,16 @@ describe('App shell', () => {
 
     await user.click(screen.getByRole('button', { name: 'stub delete' }));
     expect(clearSession).toHaveBeenCalled();
+  });
+
+  it('signs out after a password change', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('tab', { name: 'Profile' }));
+    await user.click(screen.getByRole('button', { name: 'stub password change' }));
+
+    expect(signOut).toHaveBeenCalled();
   });
 });
 

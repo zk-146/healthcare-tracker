@@ -135,6 +135,16 @@ export async function logout(api: ApiClient): Promise<void> {
   await api.post<void>('/api/v1/auth/logout');
 }
 
+/** Revokes every refresh token for the account server-side; the caller's current
+ *  access token is unaffected and stays valid until it naturally expires. */
+export async function changePassword(
+  api: ApiClient,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await api.post<void>('/api/v1/auth/change-password', { currentPassword, newPassword });
+}
+
 const OPTIONAL_FIELDS = [
   'distanceKm',
   'caloriesBurned',

@@ -31,7 +31,7 @@ function stubApi(overrides: Partial<ApiClient> = {}): ApiClient {
 describe('ProfilePage', () => {
   it('loads and displays the current profile', async () => {
     const api = stubApi();
-    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} />);
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     expect(await screen.findByDisplayValue('Ada Lovelace')).toBeInTheDocument();
     expect(screen.getByText('ada@example.com')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('ProfilePage', () => {
   it('saves edited fields and shows a confirmation', async () => {
     const updated = { ...profile, fullName: 'Ada K. Lovelace' };
     const api = stubApi({ put: vi.fn().mockResolvedValue(updated) });
-    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} />);
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     const fullName = await screen.findByLabelText(/full name/i);
     await userEvent.clear(fullName);
@@ -59,7 +59,7 @@ describe('ProfilePage', () => {
 
   it('rejects an empty full name before calling the API', async () => {
     const api = stubApi();
-    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} />);
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     const fullName = await screen.findByLabelText(/full name/i);
     await userEvent.clear(fullName);
@@ -71,7 +71,7 @@ describe('ProfilePage', () => {
 
   it('shows a conflict banner on a concurrent-edit 409', async () => {
     const api = stubApi({ put: vi.fn().mockRejectedValue(new ApiError(409, { error: 'Conflict' })) });
-    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} />);
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     await screen.findByDisplayValue('Ada Lovelace');
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
@@ -82,7 +82,7 @@ describe('ProfilePage', () => {
   it('deletes the account after confirmation and notifies the parent', async () => {
     const onAccountDeleted = vi.fn();
     const api = stubApi();
-    render(<ProfilePage api={api} onAccountDeleted={onAccountDeleted} />);
+    render(<ProfilePage api={api} onAccountDeleted={onAccountDeleted} onPasswordChanged={vi.fn()} />);
 
     await screen.findByDisplayValue('Ada Lovelace');
     await userEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -96,7 +96,7 @@ describe('ProfilePage', () => {
 
   it('does not delete when the confirmation is cancelled', async () => {
     const api = stubApi();
-    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} />);
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     await screen.findByDisplayValue('Ada Lovelace');
     await userEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -104,5 +104,26 @@ describe('ProfilePage', () => {
 
     expect(api.del).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /delete my account/i })).toBeInTheDocument();
+  });
+
+  it('changes the password and notifies the parent', async () => {
+    const onPasswordChanged = vi.fn();
+    const post = vi.fn().mockResolvedValue(undefined);
+    const api = stubApi({ post });
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={onPasswordChanged} />);
+
+    await screen.findByDisplayValue('Ada Lovelace');
+    await userEvent.type(screen.getByLabelText(/current password/i), 'OldPassw0rd!');
+    await userEvent.type(screen.getByLabelText(/^new password$/i), 'NewPassw0rd!');
+    await userEvent.type(screen.getByLabelText(/confirm new password/i), 'NewPassw0rd!');
+    await userEvent.click(screen.getByRole('button', { name: /^change password$/i }));
+
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith('/api/v1/auth/change-password', {
+        currentPassword: 'OldPassw0rd!',
+        newPassword: 'NewPassw0rd!',
+      });
+    });
+    expect(onPasswordChanged).toHaveBeenCalled();
   });
 });
