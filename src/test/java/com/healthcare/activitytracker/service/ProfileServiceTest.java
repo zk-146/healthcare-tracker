@@ -12,6 +12,7 @@ import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.repository.ActivityRepository;
+import com.healthcare.activitytracker.repository.DeepSeekConnectionRepository;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
 import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
@@ -32,6 +33,7 @@ class ProfileServiceTest {
   @Mock private ActivityRepository activityRepository;
   @Mock private RefreshTokenRepository refreshTokenRepository;
   @Mock private StreakMilestoneRepository streakMilestoneRepository;
+  @Mock private DeepSeekConnectionRepository deepSeekConnectionRepository;
 
   private ProfileService profileService;
   private final UUID userId = UUID.randomUUID();
@@ -40,7 +42,11 @@ class ProfileServiceTest {
   void setUp() {
     profileService =
         new ProfileService(
-            userRepository, activityRepository, refreshTokenRepository, streakMilestoneRepository);
+            userRepository,
+            activityRepository,
+            refreshTokenRepository,
+            streakMilestoneRepository,
+            deepSeekConnectionRepository);
   }
 
   private User buildUser() {
@@ -125,6 +131,7 @@ class ProfileServiceTest {
     verify(refreshTokenRepository).deleteAllByUserId(userId);
     verify(streakMilestoneRepository).deleteAllByUserId(userId);
     verify(activityRepository).deleteAllByUserId(userId);
+    verify(deepSeekConnectionRepository).deleteAllByUserId(userId);
     verify(userRepository).delete(user);
   }
 
@@ -138,6 +145,7 @@ class ProfileServiceTest {
     verify(refreshTokenRepository, never()).deleteAllByUserId(any());
     verify(streakMilestoneRepository, never()).deleteAllByUserId(any());
     verify(activityRepository, never()).deleteAllByUserId(any());
+    verify(deepSeekConnectionRepository, never()).deleteAllByUserId(any());
     verify(userRepository, never()).delete(any());
   }
 }

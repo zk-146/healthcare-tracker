@@ -3,6 +3,7 @@ package com.healthcare.activitytracker.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -23,7 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class NotesAnalysisServiceTest {
 
   @Mock private ActivityRepository activityRepository;
-  @Mock private OllamaClient ollamaClient;
+  @Mock private AiTextClient aiTextClient;
 
   private NotesAnalysisService notesAnalysisService;
 
@@ -33,7 +34,7 @@ class NotesAnalysisServiceTest {
   @BeforeEach
   void setUp() {
     notesAnalysisService =
-        new NotesAnalysisService(activityRepository, ollamaClient, new ObjectMapper());
+        new NotesAnalysisService(activityRepository, aiTextClient, new ObjectMapper());
   }
 
   private void stubActivityWithNotes(String notes) {
@@ -45,7 +46,7 @@ class NotesAnalysisServiceTest {
   @Test
   void extractsMoodAndPain_fromModelJson() {
     stubActivityWithNotes("Felt great but my left knee ached near the end");
-    when(ollamaClient.generateJson(any()))
+    when(aiTextClient.generateJson(eq(userId), any()))
         .thenReturn(
             Optional.of(
                 "{\"mood\":\"positive\",\"painMentioned\":true,"
@@ -61,9 +62,9 @@ class NotesAnalysisServiceTest {
   }
 
   @Test
-  void unavailable_whenOllamaDown() {
+  void unavailable_whenAiClientDown() {
     stubActivityWithNotes("some notes");
-    when(ollamaClient.generateJson(any())).thenReturn(Optional.empty());
+    when(aiTextClient.generateJson(eq(userId), any())).thenReturn(Optional.empty());
 
     NotesInsightResponse result = notesAnalysisService.analyzeNotes(userId, activityId);
 
@@ -74,7 +75,7 @@ class NotesAnalysisServiceTest {
   @Test
   void unavailable_whenModelOutputMalformed() {
     stubActivityWithNotes("some notes");
-    when(ollamaClient.generateJson(any())).thenReturn(Optional.of("not json {{{"));
+    when(aiTextClient.generateJson(eq(userId), any())).thenReturn(Optional.of("not json {{{"));
 
     NotesInsightResponse result = notesAnalysisService.analyzeNotes(userId, activityId);
 
@@ -84,7 +85,7 @@ class NotesAnalysisServiceTest {
   @Test
   void unavailable_whenModelReturnsNonObjectJson() {
     stubActivityWithNotes("some notes");
-    when(ollamaClient.generateJson(any())).thenReturn(Optional.of("\"just a string\""));
+    when(aiTextClient.generateJson(eq(userId), any())).thenReturn(Optional.of("\"just a string\""));
 
     NotesInsightResponse result = notesAnalysisService.analyzeNotes(userId, activityId);
 
@@ -94,7 +95,7 @@ class NotesAnalysisServiceTest {
   @Test
   void clampsUnexpectedMood_toUnknown() {
     stubActivityWithNotes("some notes");
-    when(ollamaClient.generateJson(any()))
+    when(aiTextClient.generateJson(eq(userId), any()))
         .thenReturn(Optional.of("{\"mood\":\"ecstatic\",\"painMentioned\":false}"));
 
     NotesInsightResponse result = notesAnalysisService.analyzeNotes(userId, activityId);
@@ -106,7 +107,7 @@ class NotesAnalysisServiceTest {
   @Test
   void truncatesOverlongPainDescription() {
     stubActivityWithNotes("some notes");
-    when(ollamaClient.generateJson(any()))
+    when(aiTextClient.generateJson(eq(userId), any()))
         .thenReturn(
             Optional.of(
                 "{\"mood\":\"neutral\",\"painMentioned\":true,\"painDescription\":\""
@@ -126,7 +127,7 @@ class NotesAnalysisServiceTest {
 
     assertThat(result.isAvailable()).isFalse();
     assertThat(result.getMessage()).isEqualTo(NotesAnalysisService.NO_NOTES_MESSAGE);
-    verifyNoInteractions(ollamaClient);
+    verifyNoInteractions(aiTextClient);
   }
 
   @Test

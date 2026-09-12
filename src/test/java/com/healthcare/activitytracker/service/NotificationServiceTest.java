@@ -1,6 +1,7 @@
 package com.healthcare.activitytracker.service;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +27,7 @@ class NotificationServiceTest {
 
   @Test
   void sendMilestoneNotification_doesNotThrow() {
-    when(milestoneMessageService.milestoneMessage(anyInt())).thenReturn("Way to go!");
+    when(milestoneMessageService.milestoneMessage(any(), anyInt())).thenReturn("Way to go!");
     User user =
         User.builder()
             .id(UUID.randomUUID())

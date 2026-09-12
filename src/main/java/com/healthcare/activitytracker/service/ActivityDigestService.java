@@ -27,11 +27,11 @@ public class ActivityDigestService {
       "No activities recorded in this period yet — log a workout to get your first digest!";
 
   private final SummaryService summaryService;
-  private final OllamaClient ollamaClient;
+  private final AiTextClient aiTextClient;
 
-  public ActivityDigestService(SummaryService summaryService, OllamaClient ollamaClient) {
+  public ActivityDigestService(SummaryService summaryService, AiTextClient aiTextClient) {
     this.summaryService = summaryService;
-    this.ollamaClient = ollamaClient;
+    this.aiTextClient = aiTextClient;
   }
 
   /**
@@ -57,7 +57,7 @@ public class ActivityDigestService {
       return response(normalized, summary, true, EMPTY_PERIOD_MESSAGE);
     }
 
-    Optional<String> digest = ollamaClient.generate(buildPrompt(normalized, summary));
+    Optional<String> digest = aiTextClient.generate(userId, buildPrompt(normalized, summary));
     return response(normalized, summary, digest.isPresent(), digest.orElse(UNAVAILABLE_MESSAGE));
   }
 
