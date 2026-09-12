@@ -5,6 +5,7 @@ import type {
   ActivityResponse,
   AuthResponse,
   CsvImportResponse,
+  DeepSeekStatusResponse,
   DigestResponse,
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
@@ -78,6 +79,21 @@ export function getGoogleHealthConnectUrl(api: ApiClient): Promise<GoogleHealthC
 
 export function disconnectGoogleHealth(api: ApiClient): Promise<void> {
   return api.del<void>('/api/v1/integrations/google-health');
+}
+
+/** Whether the current user has their own DeepSeek API key on file. */
+export function getDeepSeekStatus(api: ApiClient): Promise<DeepSeekStatusResponse> {
+  return api.get<DeepSeekStatusResponse>('/api/v1/integrations/deepseek/status');
+}
+
+/** Saves (or replaces) the current user's DeepSeek API key. */
+export function saveDeepSeekApiKey(api: ApiClient, apiKey: string): Promise<DeepSeekStatusResponse> {
+  return api.put<DeepSeekStatusResponse>('/api/v1/integrations/deepseek', { apiKey });
+}
+
+/** Removes the current user's DeepSeek API key. */
+export function disconnectDeepSeek(api: ApiClient): Promise<void> {
+  return api.del<void>('/api/v1/integrations/deepseek');
 }
 
 /** Shared by login and register — neither has a token yet, so both bypass the ApiClient. */

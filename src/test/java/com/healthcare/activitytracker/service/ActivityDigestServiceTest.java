@@ -3,6 +3,7 @@ package com.healthcare.activitytracker.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -26,7 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ActivityDigestServiceTest {
 
   @Mock private SummaryService summaryService;
-  @Mock private OllamaClient ollamaClient;
+  @Mock private AiTextClient aiTextClient;
 
   private ActivityDigestService digestService;
 
@@ -34,7 +35,7 @@ class ActivityDigestServiceTest {
 
   @BeforeEach
   void setUp() {
-    digestService = new ActivityDigestService(summaryService, ollamaClient);
+    digestService = new ActivityDigestService(summaryService, aiTextClient);
   }
 
   private SummaryResponse summaryWithData() {
@@ -64,7 +65,7 @@ class ActivityDigestServiceTest {
   @Test
   void generatesWeeklyDigest_fromSummaryStats() {
     when(summaryService.getWeeklySummary(userId, ZoneOffset.UTC)).thenReturn(summaryWithData());
-    when(ollamaClient.generate(any())).thenReturn(Optional.of("You crushed it this week!"));
+    when(aiTextClient.generate(eq(userId), any())).thenReturn(Optional.of("You crushed it this week!"));
 
     DigestResponse digest = digestService.generateDigest(userId, "weekly", ZoneOffset.UTC);
 
@@ -78,12 +79,12 @@ class ActivityDigestServiceTest {
   @Test
   void promptContainsStats_andNoPii() {
     when(summaryService.getWeeklySummary(userId, ZoneOffset.UTC)).thenReturn(summaryWithData());
-    when(ollamaClient.generate(any())).thenReturn(Optional.of("ok"));
+    when(aiTextClient.generate(eq(userId), any())).thenReturn(Optional.of("ok"));
 
     digestService.generateDigest(userId, "weekly", ZoneOffset.UTC);
 
     ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-    verify(ollamaClient).generate(prompt.capture());
+    verify(aiTextClient).generate(eq(userId), prompt.capture());
     assertThat(prompt.getValue())
         .contains("Total activities: 5")
         .contains("Current streak: 6 days")
@@ -92,9 +93,9 @@ class ActivityDigestServiceTest {
   }
 
   @Test
-  void fallsBack_whenOllamaUnavailable() {
+  void fallsBack_whenAiClientUnavailable() {
     when(summaryService.getWeeklySummary(userId, ZoneOffset.UTC)).thenReturn(summaryWithData());
-    when(ollamaClient.generate(any())).thenReturn(Optional.empty());
+    when(aiTextClient.generate(eq(userId), any())).thenReturn(Optional.empty());
 
     DigestResponse digest = digestService.generateDigest(userId, "weekly", ZoneOffset.UTC);
 
@@ -118,13 +119,13 @@ class ActivityDigestServiceTest {
 
     assertThat(digest.isAvailable()).isTrue();
     assertThat(digest.getDigest()).isEqualTo(ActivityDigestService.EMPTY_PERIOD_MESSAGE);
-    verifyNoInteractions(ollamaClient);
+    verifyNoInteractions(aiTextClient);
   }
 
   @Test
   void selectsMonthlySummary_forMonthlyPeriod() {
     when(summaryService.getMonthlySummary(userId, ZoneOffset.UTC)).thenReturn(summaryWithData());
-    when(ollamaClient.generate(any())).thenReturn(Optional.of("ok"));
+    when(aiTextClient.generate(eq(userId), any())).thenReturn(Optional.of("ok"));
 
     digestService.generateDigest(userId, "monthly", ZoneOffset.UTC);
 

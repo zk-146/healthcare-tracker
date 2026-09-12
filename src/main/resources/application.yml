@@ -128,12 +128,22 @@ app:
       lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
   summary:
     max-range-days: 365
+  ai:
+    # Which AiTextClient backs AI digests/milestone copy/notes analysis: "ollama" (local,
+    # server-wide) or "deepseek" (cloud, each user's own key from Profile > AI settings).
+    provider: ${AI_PROVIDER:ollama}
   ollama:
     enabled: ${OLLAMA_ENABLED:true}
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:qwen2.5:14b}
     connect-timeout-ms: 3000
     read-timeout-ms: ${OLLAMA_READ_TIMEOUT_MS:120000}
+  deepseek:
+    enabled: ${DEEPSEEK_ENABLED:true}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    connect-timeout-ms: ${DEEPSEEK_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${DEEPSEEK_READ_TIMEOUT_MS:60000}
   kafka:
     topics:
       activity-events: activity-events

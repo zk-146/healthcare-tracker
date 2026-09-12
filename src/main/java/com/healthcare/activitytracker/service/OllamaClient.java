@@ -3,13 +3,15 @@ package com.healthcare.activitytracker.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.OllamaProperties;
+import com.healthcare.activitytracker.util.RestClientFactory;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -19,9 +21,15 @@ import org.springframework.web.client.RestClient;
  * <p>Never throws: any transport, HTTP, or parse failure is logged at WARN and surfaced as {@link
  * Optional#empty()}, so AI-backed features degrade gracefully when Ollama is down, slow, or
  * misconfigured. Prompts are never logged — they may embed user-entered notes (PII policy).
+ *
+ * <p>Active when {@code app.ai.provider} is {@code ollama} (the default) — see {@link
+ * AiTextClient}. Ollama has no per-user credentials, so the {@code userId} on the interface
+ * methods is ignored; {@link #generate(String)}/{@link #generateJson(String)} remain the primary,
+ * directly-testable API.
  */
 @Service
-public class OllamaClient {
+@ConditionalOnProperty(prefix = "app.ai", name = "provider", havingValue = "ollama", matchIfMissing = true)
+public class OllamaClient implements AiTextClient {
 
   private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
 
@@ -32,14 +40,9 @@ public class OllamaClient {
   public OllamaClient(OllamaProperties properties, ObjectMapper objectMapper) {
     this.properties = properties;
     this.objectMapper = objectMapper;
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(properties.getConnectTimeoutMs());
-    requestFactory.setReadTimeout(properties.getReadTimeoutMs());
     this.restClient =
-        RestClient.builder()
-            .baseUrl(properties.getBaseUrl())
-            .requestFactory(requestFactory)
-            .build();
+        RestClientFactory.withTimeouts(
+            properties.getBaseUrl(), properties.getConnectTimeoutMs(), properties.getReadTimeoutMs());
   }
 
   /** Generates free-form text for the given prompt. Empty when Ollama is disabled/unavailable. */
@@ -50,6 +53,16 @@ public class OllamaClient {
   /** Same as {@link #generate}, but instructs the model to emit a single JSON object. */
   public Optional<String> generateJson(String prompt) {
     return doGenerate(prompt, true);
+  }
+
+  @Override
+  public Optional<String> generate(UUID userId, String prompt) {
+    return generate(prompt);
+  }
+
+  @Override
+  public Optional<String> generateJson(UUID userId, String prompt) {
+    return generateJson(prompt);
   }
 
   private Optional<String> doGenerate(String prompt, boolean jsonFormat) {
