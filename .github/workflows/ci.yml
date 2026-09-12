@@ -113,7 +113,7 @@ jobs:
       # misses (so it always saves) while restore-keys brings back the newest prior copy,
       # leaving dependency-check an incremental delta to fetch.
       - name: Restore NVD database
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: nvd-${{ runner.os }}-${{ github.run_id }}
@@ -130,7 +130,7 @@ jobs:
       # are red, leaving every one of them to re-download all ~390k CVEs.
       - name: Save NVD database
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: nvd-${{ runner.os }}-${{ github.run_id }}
