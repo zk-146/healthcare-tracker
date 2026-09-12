@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -156,6 +157,21 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(NoResourceFoundException.class)
   public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
     return buildResponse(HttpStatus.NOT_FOUND, "Not found");
+  }
+
+  /**
+   * A controller-thrown {@code ResponseStatusException} (e.g. 503 when an optional integration is
+   * disabled) carries its own status and reason. Without this handler it falls through to {@link
+   * #handleGeneral} — the {@code Exception.class} handler below takes precedence over Spring's
+   * default {@code ResponseStatusExceptionResolver} — and always surfaces as a 500 regardless of
+   * the status the controller set.
+   */
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
+    log.warn("Response status exception: {}", ex.getMessage());
+    HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+    return buildResponse(
+        status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status, ex.getReason());
   }
 
   @ExceptionHandler(Exception.class)
