@@ -27,7 +27,7 @@
         <spotless.version>2.43.0</spotless.version>
         <!-- Overrides the version the Spring Boot parent manages, keeping it explicit
              alongside the other pinned build-plugin versions. -->
-        <jacoco.version>0.8.12</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <google-java-format.version>1.22.0</google-java-format.version>
         <!-- springdoc 2.8.x tracks Spring Boot 3.5; the 3.x line targets Boot 4. -->
         <springdoc.version>2.8.17</springdoc.version>
