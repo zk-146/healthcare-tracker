@@ -60,9 +60,19 @@ public class OllamaClient {
     body.put("model", properties.getModel());
     body.put("prompt", prompt);
     body.put("stream", false);
+    Map<String, Object> options = new LinkedHashMap<>();
     if (jsonFormat) {
       body.put("format", "json");
+      // Structured extraction must be reproducible: the same note has to produce the same
+      // mood/pain verdict every time, or the result cannot be regression-tested or audited.
+      options.put("temperature", 0.0d);
+      options.put("seed", properties.getSeed());
+    } else {
+      // Prose is user-facing copy. Pinning it to a fixed seed would hand every user with the
+      // same streak length an identical message - the static fallback already does that.
+      options.put("temperature", properties.getTemperature());
     }
+    body.put("options", options);
     try {
       String response =
           restClient

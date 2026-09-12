@@ -29,6 +29,18 @@ public class OllamaProperties {
   /** Read timeout. Generation on modest hardware can take a while. */
   private int readTimeoutMs = 120000;
 
+  /**
+   * Sampling temperature for free-form prose (activity digests, milestone copy). Higher values give
+   * more variety between users. JSON generations ignore this and always run at 0.
+   */
+  private double temperature = 0.7;
+
+  /**
+   * Seed for JSON generations. Structured extraction runs deterministically so the same note always
+   * yields the same verdict, which is what makes it regression-testable and auditable.
+   */
+  private int seed = 42;
+
   public boolean isEnabled() {
     return enabled;
   }
@@ -67,5 +79,21 @@ public class OllamaProperties {
 
   public void setReadTimeoutMs(int readTimeoutMs) {
     this.readTimeoutMs = readTimeoutMs;
+  }
+
+  public double getTemperature() {
+    return temperature;
+  }
+
+  public void setTemperature(double temperature) {
+    this.temperature = temperature;
+  }
+
+  public int getSeed() {
+    return seed;
+  }
+
+  public void setSeed(int seed) {
+    this.seed = seed;
   }
 }
