@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>17</java.version>
-        <jjwt.version>0.12.5</jjwt.version>
+        <jjwt.version>0.13.0</jjwt.version>
         <!-- Explicitly pin Lombok version so the annotationProcessorPaths entry
              resolves correctly in all IDEs (Eclipse, VS Code Java) and CI builds.
              The Spring Boot BOM manages a version too; override here if you need a newer patch. -->
