@@ -71,6 +71,11 @@ export interface GoogleHealthConnectResponse {
   authorizationUrl: string;
 }
 
+/** Whether the current user has configured their own DeepSeek API key. */
+export interface DeepSeekStatusResponse {
+  connected: boolean;
+}
+
 /** A streak milestone the user has already earned. */
 export interface MilestoneResponse {
   milestoneDays: number;

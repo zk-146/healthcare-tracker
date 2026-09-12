@@ -1,12 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, type ApiClient } from '../api/client';
-import { deleteAccount, getProfile, updateProfile } from '../api/endpoints';
-import type { ProfileResponse } from '../api/types';
+import { deleteAccount, getDeepSeekStatus, getProfile, updateProfile } from '../api/endpoints';
+import type { DeepSeekStatusResponse, ProfileResponse } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
 import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { AiSettingsCard } from './AiSettingsCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
 import { draftFrom, validateDraft, type FieldErrors, type ProfileDraft } from './validate';
 
@@ -60,13 +61,23 @@ function Field({ id, label, error, children }: FieldProps) {
 interface ProfileFormProps {
   api: ApiClient;
   profile: ProfileResponse;
+  deepseekStatus: DeepSeekStatusResponse | null;
+  onDeepseekChanged(): void;
   onDeleted(): void;
   onPasswordChanged(): void;
   /** Injectable for tests; defaults to now. */
   now?: Date;
 }
 
-function ProfileForm({ api, profile, onDeleted, onPasswordChanged, now = new Date() }: ProfileFormProps) {
+function ProfileForm({
+  api,
+  profile,
+  deepseekStatus,
+  onDeepseekChanged,
+  onDeleted,
+  onPasswordChanged,
+  now = new Date(),
+}: ProfileFormProps) {
   const [current, setCurrent] = useState(profile);
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFrom(profile));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -198,6 +209,8 @@ function ProfileForm({ api, profile, onDeleted, onPasswordChanged, now = new Dat
         </form>
       </Card>
 
+      <AiSettingsCard api={api} status={deepseekStatus} onChanged={onDeepseekChanged} />
+
       <ChangePasswordCard api={api} onChanged={onPasswordChanged} />
 
       <Card title="Delete account">
@@ -246,7 +259,15 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({ api, onAccountDeleted, onPasswordChanged }: ProfilePageProps) {
+  const [deepseekReloadKey, setDeepseekReloadKey] = useState(0);
   const profile = useLoadable<ProfileResponse>(() => getProfile(api), [api]);
+  // Its own fetch, not a field on ProfileResponse: the DeepSeek key lives in its own
+  // integration table server-side (mirrors how Google Health's connection status is
+  // fetched separately from the profile — see DashboardPage's `sync`/FreshnessCard).
+  const deepseek = useLoadable<DeepSeekStatusResponse>(
+    () => getDeepSeekStatus(api),
+    [api, deepseekReloadKey],
+  );
 
   return (
     <>
@@ -256,6 +277,8 @@ export function ProfilePage({ api, onAccountDeleted, onPasswordChanged }: Profil
         <ProfileForm
           api={api}
           profile={profile.value}
+          deepseekStatus={deepseek.state === 'ready' ? deepseek.value : null}
+          onDeepseekChanged={() => setDeepseekReloadKey((current) => current + 1)}
           onDeleted={onAccountDeleted}
           onPasswordChanged={onPasswordChanged}
         />

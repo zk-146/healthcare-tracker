@@ -19,7 +19,11 @@ const profile: ProfileResponse = {
 
 function stubApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return {
-    get: vi.fn().mockResolvedValue(profile),
+    // The DeepSeek AI-settings card fetches its own status from a different path
+    // (its own integration table, not a field on ProfileResponse — see ProfilePage).
+    get: vi.fn().mockImplementation((path: string) =>
+      Promise.resolve(path.includes('/integrations/deepseek') ? { connected: false } : profile),
+    ),
     post: vi.fn(),
     put: vi.fn().mockResolvedValue(profile),
     del: vi.fn().mockResolvedValue(undefined),
