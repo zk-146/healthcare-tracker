@@ -110,6 +110,26 @@ describe('createApiClient', () => {
     });
   });
 
+  // Regression test for a real bug: change-password returns 401 for "current password
+  // is incorrect" (a business-logic error, not an expired token). The default 401
+  // handling would refresh the (still-valid) token, retry, get the same 401 again, and
+  // force-sign the user out -- discarding the backend's real error message. retryOn401:
+  // false must skip refresh/retry entirely and surface the body straight through.
+  it('does not refresh, retry, or sign out on a 401 when retryOn401 is false', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ status: 401, error: 'Current password is incorrect' }, 401));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+
+    await expect(
+      api.post('/api/v1/auth/change-password', { currentPassword: 'wrong' }, { retryOn401: false }),
+    ).rejects.toMatchObject({ status: 401, body: { error: 'Current password is incorrect' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onAuthFailure).not.toHaveBeenCalled();
+    expect(store.current).not.toBeNull();
+  });
+
   it('does not retry a 429', async () => {
     const fetchMock = vi
       .fn()
@@ -205,5 +225,24 @@ describe('createApiClient', () => {
       status: 409,
       body: { error: 'Activity was modified' },
     });
+  });
+
+  it('sends a multipart POST without hand-setting Content-Type', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ imported: 3 }));
+    const api = createApiClient(store, onAuthFailure, fetchMock as unknown as typeof fetch);
+    const form = new FormData();
+    form.append('file', new File(['a,b\n1,2'], 'export.csv', { type: 'text/csv' }));
+
+    const result = await api.postForm('/api/v1/activities/import/fitbit', form);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/v1/activities/import/fitbit');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(form);
+    // Left unset deliberately: the browser derives Content-Type (with the multipart
+    // boundary) from the FormData body itself; a hand-set value would break the upload.
+    expect((init.headers as Headers).get('Content-Type')).toBeNull();
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer access-1');
+    expect(result).toEqual({ imported: 3 });
   });
 });

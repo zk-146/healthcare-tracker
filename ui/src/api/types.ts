@@ -67,6 +67,66 @@ export interface GoogleHealthStatusResponse {
   lastSyncedAt: string | null;
 }
 
+export interface GoogleHealthConnectResponse {
+  authorizationUrl: string;
+}
+
+/** A streak milestone the user has already earned. */
+export interface MilestoneResponse {
+  milestoneDays: number;
+  /** Zoneless LocalDateTime. */
+  achievedAt: string;
+}
+
+export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
+
+/** Response to a Fitbit dailyActivity_merged.csv import. */
+export interface CsvImportResponse {
+  fileName: string;
+  totalRows: number;
+  imported: number;
+  duplicatesSkipped: number;
+  failed: number;
+  /** Row-level error messages, capped to a bounded prefix by the backend. */
+  errors: string[];
+}
+
+export interface DigestResponse {
+  period: string;
+  from: string;
+  to: string;
+  /** False when the LLM backing the digest is unavailable — `digest` is still a
+   *  human-readable fallback message in that case, never an error. */
+  available: boolean;
+  digest: string;
+}
+
+export interface ProfileResponse {
+  id: string;
+  email: string;
+  fullName: string;
+  /** LocalDate, "YYYY-MM-DD". */
+  dateOfBirth: string | null;
+  gender: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * The backend's PUT is a partial update — a field left out of the body is left
+ * unchanged, unlike ActivityRequest's full-replace semantics. There is no way to
+ * clear a field back to null through this endpoint.
+ */
+export interface ProfileUpdateInput {
+  fullName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  heightCm?: number;
+  weightKg?: number;
+}
+
 export interface Page<T> {
   content: T[];
   totalElements: number;
@@ -89,6 +149,14 @@ export interface ApiErrorBody {
  * endedAt and durationMinutes to agree when both are present, and the form only
  * collects duration.
  */
+/** Optional filters for GET /activities, all applied server-side and combinable. */
+export interface ActivityFilters {
+  activityType?: ActivityType;
+  /** Inclusive, "YYYY-MM-DD". */
+  from?: string;
+  to?: string;
+}
+
 export interface ActivityInput {
   activityType: ActivityType;
   /** Zoneless LocalDateTime, "YYYY-MM-DDTHH:mm:ss". */

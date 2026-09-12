@@ -1,12 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from './client';
 import {
+  changePassword,
   createActivity,
+  deleteAccount,
   deleteActivity,
+  disconnectGoogleHealth,
+  getDigest,
+  getGoogleHealthConnectUrl,
+  getMilestones,
+  getMonthlySummary,
+  getProfile,
+  getSummaryFor,
+  getWeeklySummary,
+  importFitbitCsv,
   listAllActivities,
+  login,
+  register,
   updateActivity,
+  updateProfile,
 } from './endpoints';
-import type { ActivityInput, ActivityResponse } from './types';
+import type { ActivityInput, ActivityResponse, AuthResponse, ProfileResponse } from './types';
 
 function spyClient(): ApiClient {
   return {
@@ -14,6 +28,7 @@ function spyClient(): ApiClient {
     post: vi.fn().mockResolvedValue({}),
     put: vi.fn().mockResolvedValue({}),
     del: vi.fn().mockResolvedValue(undefined),
+    postForm: vi.fn().mockResolvedValue({}),
   } as unknown as ApiClient;
 }
 
@@ -168,5 +183,233 @@ describe('activity write endpoints', () => {
     expect(api.get).toHaveBeenCalledWith(
       '/api/v1/activities?page=2&size=20&sort=startedAt%2Cdesc',
     );
+  });
+
+  it('includes only the filters that were supplied', async () => {
+    const api = spyClient();
+
+    await listAllActivities(api, 0, { activityType: 'RUNNING' });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/activities?page=0&size=20&sort=startedAt%2Cdesc&activityType=RUNNING',
+    );
+  });
+
+  it('combines the type and date-range filters', async () => {
+    const api = spyClient();
+
+    await listAllActivities(api, 0, {
+      activityType: 'YOGA',
+      from: '2026-08-01',
+      to: '2026-08-31',
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/activities?page=0&size=20&sort=startedAt%2Cdesc&activityType=YOGA&from=2026-08-01&to=2026-08-31',
+    );
+  });
+});
+
+const auth: AuthResponse = {
+  token: 'access-token',
+  refreshToken: 'refresh-token',
+  expiresIn: 900,
+  userId: 'u1',
+  email: 'ada@example.com',
+};
+
+function fetchStub(status: number, body: unknown) {
+  return vi.fn().mockResolvedValue({
+    ok: status < 400,
+    status,
+    json: () => Promise.resolve(body),
+  });
+}
+
+describe('changePassword', () => {
+  it('posts current and new password to the authenticated client', async () => {
+    const api = spyClient();
+
+    await changePassword(api, 'OldPassw0rd!', 'NewPassw0rd!');
+
+    // retryOn401: false -- this endpoint returns 401 for "current password is incorrect",
+    // a business-logic error, not an expired token. Without it, ApiClient's default 401
+    // handling would refresh the (perfectly valid) token, retry, get the same 401 again,
+    // and force-sign the user out instead of surfacing the real error. See client.test.ts
+    // for the end-to-end regression test against the real ApiClient.
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/auth/change-password',
+      { currentPassword: 'OldPassw0rd!', newPassword: 'NewPassw0rd!' },
+      { retryOn401: false },
+    );
+  });
+});
+
+describe('unauthenticated auth endpoints', () => {
+  it('posts login credentials with the timezone header, no bearer token', async () => {
+    const fetchImpl = fetchStub(200, auth);
+
+    const result = await login('ada@example.com', 'hunter2', fetchImpl as unknown as typeof fetch);
+
+    expect(result).toEqual(auth);
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/login');
+    expect(JSON.parse(init.body as string)).toEqual({ email: 'ada@example.com', password: 'hunter2' });
+    const headers = init.headers as Record<string, string>;
+    expect(headers['X-User-Timezone']).toBeTruthy();
+    expect(headers.Authorization).toBeUndefined();
+  });
+
+  it('posts registration details and returns the token pair', async () => {
+    const fetchImpl = fetchStub(201, auth);
+
+    const result = await register(
+      'ada@example.com',
+      'Sup3r-Secret!',
+      'Ada Lovelace',
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual(auth);
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/register');
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: 'ada@example.com',
+      password: 'Sup3r-Secret!',
+      fullName: 'Ada Lovelace',
+    });
+  });
+
+  it('throws an ApiError carrying the response body on failure', async () => {
+    const details = { email: 'Email already registered' };
+    const fetchImpl = fetchStub(409, { error: 'Conflict', details });
+
+    await expect(
+      register('ada@example.com', 'Sup3r-Secret!', 'Ada Lovelace', fetchImpl as unknown as typeof fetch),
+    ).rejects.toMatchObject({ status: 409, body: { error: 'Conflict', details } });
+  });
+});
+
+const profile: ProfileResponse = {
+  id: 'u1',
+  email: 'ada@example.com',
+  fullName: 'Ada Lovelace',
+  dateOfBirth: '1990-01-01',
+  gender: 'female',
+  heightCm: 170,
+  weightKg: 62,
+  createdAt: '2026-01-01T00:00:00',
+  updatedAt: '2026-01-01T00:00:00',
+};
+
+describe('profile endpoints', () => {
+  it('fetches the current profile', async () => {
+    const api = spyClient();
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue(profile);
+
+    const result = await getProfile(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/profile');
+    expect(result).toEqual(profile);
+  });
+
+  it('puts a partial update as given, without inventing fields', async () => {
+    const api = spyClient();
+
+    await updateProfile(api, { fullName: 'Ada K. Lovelace' });
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/profile', { fullName: 'Ada K. Lovelace' });
+  });
+
+  it('deletes the account', async () => {
+    const api = spyClient();
+
+    await deleteAccount(api);
+
+    expect(api.del).toHaveBeenCalledWith('/api/v1/profile');
+  });
+});
+
+describe('google health integration endpoints', () => {
+  it('fetches the authorization URL to start the connect flow', async () => {
+    const api = spyClient();
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      authorizationUrl: 'https://accounts.google.com/auth',
+    });
+
+    const result = await getGoogleHealthConnectUrl(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/integrations/google-health/connect');
+    expect(result).toEqual({ authorizationUrl: 'https://accounts.google.com/auth' });
+  });
+
+  it('disconnects the integration', async () => {
+    const api = spyClient();
+
+    await disconnectGoogleHealth(api);
+
+    expect(api.del).toHaveBeenCalledWith('/api/v1/integrations/google-health');
+  });
+});
+
+describe('summary period endpoints', () => {
+  it('requests the weekly and monthly summary endpoints directly', async () => {
+    const api = spyClient();
+
+    await getWeeklySummary(api);
+    await getMonthlySummary(api);
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/api/v1/summary/weekly');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/summary/monthly');
+  });
+
+  it.each([
+    ['daily', '/api/v1/summary/daily'],
+    ['weekly', '/api/v1/summary/weekly'],
+    ['monthly', '/api/v1/summary/monthly'],
+  ] as const)('getSummaryFor(%s) hits %s', async (period, path) => {
+    const api = spyClient();
+
+    await getSummaryFor(api, period);
+
+    expect(api.get).toHaveBeenCalledWith(path);
+  });
+
+  it('requests a digest for the given period', async () => {
+    const api = spyClient();
+
+    await getDigest(api, 'monthly');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/summary/digest?period=monthly');
+  });
+});
+
+describe('importFitbitCsv', () => {
+  it('posts the file as multipart form data under the "file" field', async () => {
+    const api = spyClient();
+    const file = new File(['a,b\n1,2'], 'dailyActivity_merged.csv', { type: 'text/csv' });
+
+    await importFitbitCsv(api, file);
+
+    expect(api.postForm).toHaveBeenCalledTimes(1);
+    const [path, form] = (api.postForm as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      FormData,
+    ];
+    expect(path).toBe('/api/v1/activities/import/fitbit');
+    expect(form.get('file')).toBe(file);
+  });
+});
+
+describe('getMilestones', () => {
+  it('requests the earned-milestones list', async () => {
+    const api = spyClient();
+    const milestones = [{ milestoneDays: 7, achievedAt: '2026-08-20T09:00:00' }];
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue(milestones);
+
+    const result = await getMilestones(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/milestones');
+    expect(result).toEqual(milestones);
   });
 });
