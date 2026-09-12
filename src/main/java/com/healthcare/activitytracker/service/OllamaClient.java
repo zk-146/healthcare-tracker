@@ -23,12 +23,16 @@ import org.springframework.web.client.RestClient;
  * misconfigured. Prompts are never logged — they may embed user-entered notes (PII policy).
  *
  * <p>Active when {@code app.ai.provider} is {@code ollama} (the default) — see {@link
- * AiTextClient}. Ollama has no per-user credentials, so the {@code userId} on the interface
- * methods is ignored; {@link #generate(String)}/{@link #generateJson(String)} remain the primary,
+ * AiTextClient}. Ollama has no per-user credentials, so the {@code userId} on the interface methods
+ * is ignored; {@link #generate(String)}/{@link #generateJson(String)} remain the primary,
  * directly-testable API.
  */
 @Service
-@ConditionalOnProperty(prefix = "app.ai", name = "provider", havingValue = "ollama", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "app.ai",
+    name = "provider",
+    havingValue = "ollama",
+    matchIfMissing = true)
 public class OllamaClient implements AiTextClient {
 
   private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
@@ -42,7 +46,9 @@ public class OllamaClient implements AiTextClient {
     this.objectMapper = objectMapper;
     this.restClient =
         RestClientFactory.withTimeouts(
-            properties.getBaseUrl(), properties.getConnectTimeoutMs(), properties.getReadTimeoutMs());
+            properties.getBaseUrl(),
+            properties.getConnectTimeoutMs(),
+            properties.getReadTimeoutMs());
   }
 
   /** Generates free-form text for the given prompt. Empty when Ollama is disabled/unavailable. */

@@ -65,7 +65,8 @@ class ActivityDigestServiceTest {
   @Test
   void generatesWeeklyDigest_fromSummaryStats() {
     when(summaryService.getWeeklySummary(userId, ZoneOffset.UTC)).thenReturn(summaryWithData());
-    when(aiTextClient.generate(eq(userId), any())).thenReturn(Optional.of("You crushed it this week!"));
+    when(aiTextClient.generate(eq(userId), any()))
+        .thenReturn(Optional.of("You crushed it this week!"));
 
     DigestResponse digest = digestService.generateDigest(userId, "weekly", ZoneOffset.UTC);
 

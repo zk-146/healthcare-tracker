@@ -33,7 +33,8 @@ class MilestoneMessageServiceTest {
   void returnsModelCopy_whenAvailable() {
     when(aiTextClient.generate(eq(userId), any()))
         .thenReturn(Optional.of("Seven days strong — amazing!"));
-    assertThat(messageService.milestoneMessage(userId, 7)).isEqualTo("Seven days strong — amazing!");
+    assertThat(messageService.milestoneMessage(userId, 7))
+        .isEqualTo("Seven days strong — amazing!");
   }
 
   @Test
