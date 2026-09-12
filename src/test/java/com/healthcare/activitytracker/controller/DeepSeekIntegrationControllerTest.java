@@ -9,12 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthcare.activitytracker.config.SecurityConfig;
 import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.DeepSeekConnectionService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -71,7 +71,9 @@ class DeepSeekIntegrationControllerTest {
 
   @Test
   void status_requiresAuthentication() throws Exception {
-    mockMvc.perform(get("/api/v1/integrations/deepseek/status")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/integrations/deepseek/status"))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

@@ -67,7 +67,11 @@ class DeepSeekConnectionServiceTest {
   @Test
   void saveApiKey_replacesTheExistingConnection() {
     DeepSeekConnection existing =
-        DeepSeekConnection.builder().id(UUID.randomUUID()).user(user).apiKeyEncrypted("old").build();
+        DeepSeekConnection.builder()
+            .id(UUID.randomUUID())
+            .user(user)
+            .apiKeyEncrypted("old")
+            .build();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(connectionRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
     when(tokenCipher.encrypt("sk-new-key")).thenReturn("new-cipher-blob");

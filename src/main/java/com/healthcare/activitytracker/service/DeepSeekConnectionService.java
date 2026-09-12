@@ -41,10 +41,9 @@ public class DeepSeekConnectionService {
 
   /**
    * Saves (or replaces) the user's API key, encrypted at rest. The key is trimmed first: a value
-   * pasted with a trailing newline or leading/trailing spaces — common when copying from a
-   * terminal or a {@code .env} file — is not blank, so an untrimmed value would otherwise be
-   * stored verbatim and then fail every DeepSeek call with no diagnostic pointing back to the
-   * whitespace.
+   * pasted with a trailing newline or leading/trailing spaces — common when copying from a terminal
+   * or a {@code .env} file — is not blank, so an untrimmed value would otherwise be stored verbatim
+   * and then fail every DeepSeek call with no diagnostic pointing back to the whitespace.
    */
   @Transactional
   public void saveApiKey(UUID userId, String apiKey) {

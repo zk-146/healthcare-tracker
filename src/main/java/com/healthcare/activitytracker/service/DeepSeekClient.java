@@ -52,7 +52,9 @@ public class DeepSeekClient implements AiTextClient {
     this.objectMapper = objectMapper;
     this.restClient =
         RestClientFactory.withTimeouts(
-            properties.getBaseUrl(), properties.getConnectTimeoutMs(), properties.getReadTimeoutMs());
+            properties.getBaseUrl(),
+            properties.getConnectTimeoutMs(),
+            properties.getReadTimeoutMs());
   }
 
   @Override

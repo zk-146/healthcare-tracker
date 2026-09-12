@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Endpoints for the owner's own DeepSeek API key (Profile &gt; AI settings), used instead of the
  * shared local Ollama instance when {@code app.ai.provider=deepseek}.
  */
-@Tag(name = "DeepSeek Integration", description = "Configure the current user's own DeepSeek API key")
+@Tag(
+    name = "DeepSeek Integration",
+    description = "Configure the current user's own DeepSeek API key")
 @RestController
 @RequestMapping("/api/v1/integrations/deepseek")
 public class DeepSeekIntegrationController {

@@ -18,9 +18,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Encrypts and decrypts secrets before they are persisted, so a database leak does not expose
- * usable credentials. Originally built for Google Health's OAuth tokens; also used for a user's
- * own DeepSeek API key (see {@link com.healthcare.activitytracker.service.DeepSeekClient}) — both
- * are opaque strings under the app's single trust boundary, so one AES-GCM box serves either.
+ * usable credentials. Originally built for Google Health's OAuth tokens; also used for a user's own
+ * DeepSeek API key (see {@link com.healthcare.activitytracker.service.DeepSeekClient}) — both are
+ * opaque strings under the app's single trust boundary, so one AES-GCM box serves either.
  *
  * <p>Uses AES-256-GCM. A fresh random 96-bit IV is generated per encryption and prepended to the
  * ciphertext; the whole blob is Base64-encoded for storage in a TEXT column.

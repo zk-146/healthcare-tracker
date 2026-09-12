@@ -16,8 +16,8 @@ import java.util.UUID;
  * return {@link Optional#empty()} rather than throw, matching the "never blocks the caller"
  * contract every implementation follows.
  *
- * <p>Never throws: any failure — network, auth, malformed output, missing credentials — is an
- * empty {@link Optional}, so every caller already has graceful-degradation logic built in.
+ * <p>Never throws: any failure — network, auth, malformed output, missing credentials — is an empty
+ * {@link Optional}, so every caller already has graceful-degradation logic built in.
  */
 public interface AiTextClient {
 
