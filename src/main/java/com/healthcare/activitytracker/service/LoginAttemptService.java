@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
@@ -51,6 +52,10 @@ public class LoginAttemptService {
 
   private final LongSupplier nowMs;
 
+  // With two declared constructors and neither a no-arg nor a Kotlin-style primary constructor,
+  // Spring can't infer which one to wire without this: it would otherwise fail bean creation
+  // with "No default constructor found".
+  @Autowired
   public LoginAttemptService(
       @Nullable StringRedisTemplate redisTemplate,
       @Value("${app.security.login.max-attempts:10}") int maxAttempts,
