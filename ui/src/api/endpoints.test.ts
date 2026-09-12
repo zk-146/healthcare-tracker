@@ -232,10 +232,16 @@ describe('changePassword', () => {
 
     await changePassword(api, 'OldPassw0rd!', 'NewPassw0rd!');
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/auth/change-password', {
-      currentPassword: 'OldPassw0rd!',
-      newPassword: 'NewPassw0rd!',
-    });
+    // retryOn401: false -- this endpoint returns 401 for "current password is incorrect",
+    // a business-logic error, not an expired token. Without it, ApiClient's default 401
+    // handling would refresh the (perfectly valid) token, retry, get the same 401 again,
+    // and force-sign the user out instead of surfacing the real error. See client.test.ts
+    // for the end-to-end regression test against the real ApiClient.
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/auth/change-password',
+      { currentPassword: 'OldPassw0rd!', newPassword: 'NewPassw0rd!' },
+      { retryOn401: false },
+    );
   });
 });
 

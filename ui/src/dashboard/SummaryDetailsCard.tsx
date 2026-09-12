@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type ApiClient } from '../api/client';
 import { getDigest, getSummaryFor } from '../api/endpoints';
 import type { DigestResponse, SummaryPeriod, SummaryResponse } from '../api/types';
@@ -34,6 +34,14 @@ export function SummaryDetailsCard({ api }: SummaryDetailsCardProps) {
   const summary = useLoadable<SummaryResponse>(() => getSummaryFor(api, period), [api, period]);
   const [digest, setDigest] = useState<Loadable<DigestResponse> | null>(null);
 
+  // Tracks the *current* period so an in-flight loadDigest() can tell, at resolution
+  // time, whether the user has since switched away from the period it was requested
+  // for. A plain closure variable can't do this: `period` inside loadDigest is fixed
+  // to the value at the render that created the closure, so it never changes even
+  // after the user switches periods mid-request.
+  const periodRef = useRef(period);
+  periodRef.current = period;
+
   // A digest fetched for one period is stale (and possibly costly to regenerate) once the
   // period changes, so drop it rather than showing last period's recap under a new label.
   useEffect(() => {
@@ -41,12 +49,21 @@ export function SummaryDetailsCard({ api }: SummaryDetailsCardProps) {
   }, [period]);
 
   async function loadDigest(): Promise<void> {
+    const requestedPeriod = period;
     setDigest({ state: 'loading' });
     try {
-      const value = await getDigest(api, period);
+      const value = await getDigest(api, requestedPeriod);
+      if (periodRef.current !== requestedPeriod) {
+        // The user switched periods before this resolved; the effect above already
+        // cleared `digest` for the new period, so applying this stale result would
+        // show one period's recap mislabeled as another's.
+        return;
+      }
       setDigest({ state: 'ready', value });
     } catch (cause: unknown) {
-      setDigest({ state: 'error', message: messageFor(cause) });
+      if (periodRef.current === requestedPeriod) {
+        setDigest({ state: 'error', message: messageFor(cause) });
+      }
     }
   }
 

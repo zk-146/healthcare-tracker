@@ -29,10 +29,11 @@ describe('ChangePasswordCard', () => {
     await fill();
 
     await waitFor(() => {
-      expect(post).toHaveBeenCalledWith('/api/v1/auth/change-password', {
-        currentPassword: 'OldPassw0rd!',
-        newPassword: 'NewPassw0rd!',
-      });
+      expect(post).toHaveBeenCalledWith(
+        '/api/v1/auth/change-password',
+        { currentPassword: 'OldPassw0rd!', newPassword: 'NewPassw0rd!' },
+        { retryOn401: false },
+      );
     });
     expect(onChanged).toHaveBeenCalled();
   });

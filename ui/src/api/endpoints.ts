@@ -135,14 +135,25 @@ export async function logout(api: ApiClient): Promise<void> {
   await api.post<void>('/api/v1/auth/logout');
 }
 
-/** Revokes every refresh token for the account server-side; the caller's current
- *  access token is unaffected and stays valid until it naturally expires. */
+/**
+ * Revokes every refresh token for the account server-side; the caller's current
+ * access token is unaffected and stays valid until it naturally expires.
+ *
+ * `retryOn401: false` because this endpoint returns 401 for "current password is
+ * incorrect" — a business-logic error, not an expired token. Without it, ApiClient's
+ * default 401 handling would refresh the (perfectly valid) token, retry, get the same
+ * 401 again, and force-sign the user out instead of surfacing the real error.
+ */
 export async function changePassword(
   api: ApiClient,
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  await api.post<void>('/api/v1/auth/change-password', { currentPassword, newPassword });
+  await api.post<void>(
+    '/api/v1/auth/change-password',
+    { currentPassword, newPassword },
+    { retryOn401: false },
+  );
 }
 
 const OPTIONAL_FIELDS = [

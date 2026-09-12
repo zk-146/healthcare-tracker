@@ -69,6 +69,23 @@ describe('ProfilePage', () => {
     expect(api.put).not.toHaveBeenCalled();
   });
 
+  // Regression test: the backend's PUT can't clear a field back to null, so blanking
+  // gender (which the fixture profile has set) used to be silently omitted from the
+  // request -- the save "succeeded", but the server's response still carried the old
+  // value and the form reverted to it right under a "Saved." message. It must now be
+  // rejected up front instead, with no API call at all.
+  it('rejects clearing a previously-set optional field instead of silently keeping it', async () => {
+    const api = stubApi();
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
+
+    const gender = await screen.findByLabelText(/gender/i);
+    await userEvent.clear(gender);
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(await screen.findByText(/can't be cleared/i)).toBeInTheDocument();
+    expect(api.put).not.toHaveBeenCalled();
+  });
+
   it('shows a conflict banner on a concurrent-edit 409', async () => {
     const api = stubApi({ put: vi.fn().mockRejectedValue(new ApiError(409, { error: 'Conflict' })) });
     render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
@@ -119,10 +136,11 @@ describe('ProfilePage', () => {
     await userEvent.click(screen.getByRole('button', { name: /^change password$/i }));
 
     await waitFor(() => {
-      expect(post).toHaveBeenCalledWith('/api/v1/auth/change-password', {
-        currentPassword: 'OldPassw0rd!',
-        newPassword: 'NewPassw0rd!',
-      });
+      expect(post).toHaveBeenCalledWith(
+        '/api/v1/auth/change-password',
+        { currentPassword: 'OldPassw0rd!', newPassword: 'NewPassw0rd!' },
+        { retryOn401: false },
+      );
     });
     expect(onPasswordChanged).toHaveBeenCalled();
   });
