@@ -21,12 +21,33 @@ export class ApiError extends Error {
   }
 }
 
+export interface PostOptions {
+  /**
+   * Whether a 401 response should be treated as an expired access token: refreshed and
+   * retried, force-signing the user out if the retry is still 401. Default true.
+   *
+   * Set to false for an authenticated endpoint that legitimately returns 401 for a
+   * business-logic reason unrelated to token expiry (e.g. "current password is
+   * incorrect"). Without this, such a 401 triggers a pointless refresh (the token was
+   * never expired), the retry fails for the same business reason, and the generic
+   * retry-exhausted path force-logs the user out and discards the backend's real error
+   * message instead of surfacing it.
+   */
+  retryOn401?: boolean;
+}
+
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
-  post<T>(path: string, body?: unknown): Promise<T>;
+  post<T>(path: string, body?: unknown, opts?: PostOptions): Promise<T>;
   put<T>(path: string, body?: unknown): Promise<T>;
   /** Named `del` because `delete` is a reserved word. */
   del<T>(path: string): Promise<T>;
+  /**
+   * Multipart upload (file imports). Distinct from `post` because a FormData body must
+   * NOT get a hand-set Content-Type: the browser derives one with the multipart
+   * boundary, and overriding it (as `post`'s JSON path does) breaks the upload.
+   */
+  postForm<T>(path: string, form: FormData): Promise<T>;
 }
 
 async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
@@ -63,7 +84,7 @@ export function createApiClient(
     if (tokens !== null) {
       headers.set('Authorization', `Bearer ${tokens.token}`);
     }
-    if (init.body !== undefined) {
+    if (init.body !== undefined && !(init.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json');
     }
     return fetchImpl(path, { ...init, headers });
@@ -109,10 +130,15 @@ export function createApiClient(
     return refreshInFlight;
   }
 
-  async function request<T>(path: string, init: RequestInit): Promise<T> {
+  async function request<T>(
+    path: string,
+    init: RequestInit,
+    opts?: PostOptions,
+  ): Promise<T> {
+    const retryOn401 = opts?.retryOn401 ?? true;
     let response = await send(path, init);
 
-    if (response.status === 401) {
+    if (retryOn401 && response.status === 401) {
       try {
         await refresh();
       } catch {
@@ -139,11 +165,15 @@ export function createApiClient(
     get<T>(path: string) {
       return request<T>(path, { method: 'GET' });
     },
-    post<T>(path: string, body?: unknown) {
-      return request<T>(path, {
-        method: 'POST',
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
+    post<T>(path: string, body?: unknown, opts?: PostOptions) {
+      return request<T>(
+        path,
+        {
+          method: 'POST',
+          body: body === undefined ? undefined : JSON.stringify(body),
+        },
+        opts,
+      );
     },
     put<T>(path: string, body?: unknown) {
       return request<T>(path, {
@@ -153,6 +183,9 @@ export function createApiClient(
     },
     del<T>(path: string) {
       return request<T>(path, { method: 'DELETE' });
+    },
+    postForm<T>(path: string, form: FormData) {
+      return request<T>(path, { method: 'POST', body: form });
     },
   };
 }

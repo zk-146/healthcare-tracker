@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { type ApiClient } from '../api/client';
 import { getDailySummary, getSyncStatus, listActivities } from '../api/endpoints';
 import type { ActivityResponse, GoogleHealthStatusResponse, SummaryResponse } from '../api/types';
@@ -7,9 +8,11 @@ import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
 import { FreshnessCard } from './FreshnessCard';
 import { LatestDayCard } from './LatestDayCard';
+import { MilestonesCard } from './MilestonesCard';
 import { RecentDaysList } from './RecentDaysList';
 import { SevenDayChart } from './SevenDayChart';
 import { StreakHero } from './StreakHero';
+import { SummaryDetailsCard } from './SummaryDetailsCard';
 
 const LOOKBACK_DAYS = 30; // fetch window: wide enough to find the newest row even when stale
 const CHART_DAYS = 7;     // display window: what the chart and recent-days list show
@@ -21,6 +24,7 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
+  const [syncReloadKey, setSyncReloadKey] = useState(0);
   const lookbackKeys = rollingWindow(today, LOOKBACK_DAYS);
   const chartKeys = lookbackKeys.slice(-CHART_DAYS);
   const from = lookbackKeys[0];
@@ -39,7 +43,10 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
       }),
     [api, from, to],
   );
-  const sync = useLoadable<GoogleHealthStatusResponse>(() => getSyncStatus(api), [api]);
+  const sync = useLoadable<GoogleHealthStatusResponse>(
+    () => getSyncStatus(api),
+    [api, syncReloadKey],
+  );
 
   const lookbackBuckets: DayBucket[] =
     activities.state === 'ready' ? bucketByDay(activities.value, lookbackKeys) : [];
@@ -62,6 +69,8 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
       {summary.state === 'error' && <ErrorNote message={summary.message} />}
       {summary.state === 'ready' && <StreakHero streakDays={summary.value.streakDays} />}
 
+      <MilestonesCard api={api} />
+
       {activities.state === 'loading' && <Skeleton height={110} />}
       {activities.state === 'error' && <ErrorNote message={activities.message} />}
       {activities.state === 'ready' && (
@@ -72,12 +81,16 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
         </>
       )}
 
+      <SummaryDetailsCard api={api} />
+
       {sync.state !== 'loading' && (
         <FreshnessCard
+          api={api}
           latestDayKey={latestDayKey}
           today={today}
           status={sync.state === 'ready' ? sync.value : null}
           syncError={sync.state === 'error'}
+          onDisconnected={() => setSyncReloadKey((current) => current + 1)}
         />
       )}
     </>

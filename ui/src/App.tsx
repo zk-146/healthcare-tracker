@@ -1,18 +1,27 @@
 import { useState } from 'react';
 import { useAuth } from './auth/useAuth';
 import { LoginPage } from './auth/LoginPage';
+import { RegisterPage } from './auth/RegisterPage';
 import { DashboardPage } from './dashboard/DashboardPage';
+import { ProfilePage } from './profile/ProfilePage';
 import { WorkoutsPage } from './workouts/WorkoutsPage';
 
-type View = 'activity' | 'workouts';
+type View = 'activity' | 'workouts' | 'profile';
+type AuthView = 'login' | 'register';
 
 export function App() {
-  const { api, isAuthenticated, signIn, signOut } = useAuth();
+  const { api, isAuthenticated, signIn, signUp, signOut, clearSession } = useAuth();
   const [view, setView] = useState<View>('activity');
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [authView, setAuthView] = useState<AuthView>('login');
 
   if (!isAuthenticated) {
-    return <LoginPage onSubmit={signIn} />;
+    return authView === 'login' ? (
+      <LoginPage onSubmit={signIn} onSwitchToRegister={() => setAuthView('register')} />
+    ) : (
+      <RegisterPage onSubmit={signUp} onSwitchToLogin={() => setAuthView('login')} />
+    );
   }
 
   return (
@@ -21,9 +30,14 @@ export function App() {
         <h1 className="app-title">Activity Tracker</h1>
         <div className="app-header-actions">
           {view === 'workouts' && (
-            <button type="button" className="link-button" onClick={() => setCreateOpen(true)}>
-              ＋ Log workout
-            </button>
+            <>
+              <button type="button" className="link-button" onClick={() => setImportOpen(true)}>
+                Import CSV
+              </button>
+              <button type="button" className="link-button" onClick={() => setCreateOpen(true)}>
+                ＋ Log workout
+              </button>
+            </>
           )}
           <button type="button" className="link-button" onClick={() => void signOut()}>
             Sign out
@@ -50,6 +64,15 @@ export function App() {
         >
           Workouts
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'profile'}
+          className="tab"
+          onClick={() => setView('profile')}
+        >
+          Profile
+        </button>
       </nav>
 
       {/*
@@ -57,13 +80,21 @@ export function App() {
         returning to Activity refetches the dashboard, so an edit made on the Workouts
         tab is reflected without any invalidation logic. Cost: a brief skeleton.
       */}
-      {view === 'activity' ? (
-        <DashboardPage api={api} />
-      ) : (
+      {view === 'activity' && <DashboardPage api={api} />}
+      {view === 'workouts' && (
         <WorkoutsPage
           api={api}
           createOpen={createOpen}
           onCreateClose={() => setCreateOpen(false)}
+          importOpen={importOpen}
+          onImportClose={() => setImportOpen(false)}
+        />
+      )}
+      {view === 'profile' && (
+        <ProfilePage
+          api={api}
+          onAccountDeleted={clearSession}
+          onPasswordChanged={() => void signOut()}
         />
       )}
     </main>

@@ -1,16 +1,53 @@
 import { ApiError, type ApiClient } from './client';
 import type {
+  ActivityFilters,
   ActivityInput,
   ActivityResponse,
   AuthResponse,
+  CsvImportResponse,
+  DigestResponse,
+  GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
+  MilestoneResponse,
   Page,
+  ProfileResponse,
+  ProfileUpdateInput,
+  SummaryPeriod,
   SummaryResponse,
 } from './types';
 
 /** Today's summary in the caller's timezone. Supplies streakDays for the hero. */
 export function getDailySummary(api: ApiClient): Promise<SummaryResponse> {
   return api.get<SummaryResponse>('/api/v1/summary/daily');
+}
+
+/** Week-to-date (Monday through today) in the caller's timezone. */
+export function getWeeklySummary(api: ApiClient): Promise<SummaryResponse> {
+  return api.get<SummaryResponse>('/api/v1/summary/weekly');
+}
+
+/** Month-to-date (1st through today) in the caller's timezone. */
+export function getMonthlySummary(api: ApiClient): Promise<SummaryResponse> {
+  return api.get<SummaryResponse>('/api/v1/summary/monthly');
+}
+
+export function getSummaryFor(api: ApiClient, period: SummaryPeriod): Promise<SummaryResponse> {
+  if (period === 'daily') {
+    return getDailySummary(api);
+  }
+  if (period === 'weekly') {
+    return getWeeklySummary(api);
+  }
+  return getMonthlySummary(api);
+}
+
+/**
+ * An AI-generated natural-language recap. Never rejects on the LLM being unavailable —
+ * check `available` on the response, which already carries a human-readable fallback
+ * message in `digest` either way.
+ */
+export function getDigest(api: ApiClient, period: SummaryPeriod): Promise<DigestResponse> {
+  return api.get<DigestResponse>(`/api/v1/summary/digest?period=${period}`);
 }
 
 /**
@@ -30,37 +67,93 @@ export function getSyncStatus(api: ApiClient): Promise<GoogleHealthStatusRespons
   return api.get<GoogleHealthStatusResponse>('/api/v1/integrations/google-health/status');
 }
 
-/** Login runs before any token exists, so it bypasses the authenticated client. */
-export async function login(
-  email: string,
-  password: string,
-  fetchImpl: typeof fetch = fetch,
+/**
+ * Starts the link flow: the caller opens the returned URL in a browser tab, approves
+ * access with Google, and is redirected to the backend's (non-SPA) callback page. There
+ * is nothing to await here beyond getting that URL — completion is out of band.
+ */
+export function getGoogleHealthConnectUrl(api: ApiClient): Promise<GoogleHealthConnectResponse> {
+  return api.get<GoogleHealthConnectResponse>('/api/v1/integrations/google-health/connect');
+}
+
+export function disconnectGoogleHealth(api: ApiClient): Promise<void> {
+  return api.del<void>('/api/v1/integrations/google-health');
+}
+
+/** Shared by login and register — neither has a token yet, so both bypass the ApiClient. */
+async function unauthenticatedPost(
+  path: string,
+  body: unknown,
+  fetchImpl: typeof fetch,
 ): Promise<AuthResponse> {
   // Global constraint: every API call sends X-User-Timezone, including pre-auth calls.
   // Do not simplify this back to a bare Content-Type header.
-  const response = await fetchImpl('/api/v1/auth/login', {
+  const response = await fetchImpl(path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-User-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
-    let body = null;
+    let errorBody = null;
     try {
-      body = await response.json();
+      errorBody = await response.json();
     } catch {
-      body = null;
+      errorBody = null;
     }
-    throw new ApiError(response.status, body);
+    throw new ApiError(response.status, errorBody);
   }
   return (await response.json()) as AuthResponse;
+}
+
+/** Login runs before any token exists, so it bypasses the authenticated client. */
+export function login(
+  email: string,
+  password: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthResponse> {
+  return unauthenticatedPost('/api/v1/auth/login', { email, password }, fetchImpl);
+}
+
+/**
+ * Registers a new account and returns the same token pair as login, so the caller can
+ * sign the user straight in without a second round trip.
+ */
+export function register(
+  email: string,
+  password: string,
+  fullName: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthResponse> {
+  return unauthenticatedPost('/api/v1/auth/register', { email, password, fullName }, fetchImpl);
 }
 
 /** Blacklists the access token server-side rather than merely discarding it. */
 export async function logout(api: ApiClient): Promise<void> {
   await api.post<void>('/api/v1/auth/logout');
+}
+
+/**
+ * Revokes every refresh token for the account server-side; the caller's current
+ * access token is unaffected and stays valid until it naturally expires.
+ *
+ * `retryOn401: false` because this endpoint returns 401 for "current password is
+ * incorrect" — a business-logic error, not an expired token. Without it, ApiClient's
+ * default 401 handling would refresh the (perfectly valid) token, retry, get the same
+ * 401 again, and force-sign the user out instead of surfacing the real error.
+ */
+export async function changePassword(
+  api: ApiClient,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await api.post<void>(
+    '/api/v1/auth/change-password',
+    { currentPassword, newPassword },
+    { retryOn401: false },
+  );
 }
 
 const OPTIONAL_FIELDS = [
@@ -154,11 +247,57 @@ export function deleteActivity(api: ApiClient, id: string): Promise<void> {
  * Full history, newest first — unlike listActivities, which windows by date for the
  * dashboard. Page size 20 keeps the first paint small on a phone.
  */
-export function listAllActivities(api: ApiClient, page: number): Promise<Page<ActivityResponse>> {
+export function listAllActivities(
+  api: ApiClient,
+  page: number,
+  filters: ActivityFilters = {},
+): Promise<Page<ActivityResponse>> {
   const params = new URLSearchParams({
     page: String(page),
     size: '20',
     sort: 'startedAt,desc',
   });
+  if (filters.activityType !== undefined) {
+    params.set('activityType', filters.activityType);
+  }
+  if (filters.from !== undefined) {
+    params.set('from', filters.from);
+  }
+  if (filters.to !== undefined) {
+    params.set('to', filters.to);
+  }
   return api.get<Page<ActivityResponse>>(`/api/v1/activities?${params.toString()}`);
+}
+
+/** Imports a Fitbit `dailyActivity_merged.csv` export. Rows already imported are
+ *  skipped server-side; malformed rows are skipped and reported, not fatal. */
+export function importFitbitCsv(api: ApiClient, file: File): Promise<CsvImportResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  return api.postForm<CsvImportResponse>('/api/v1/activities/import/fitbit', form);
+}
+
+/** Every streak milestone the caller has earned, longest streak first. */
+export function getMilestones(api: ApiClient): Promise<MilestoneResponse[]> {
+  return api.get<MilestoneResponse[]>('/api/v1/milestones');
+}
+
+export function getProfile(api: ApiClient): Promise<ProfileResponse> {
+  return api.get<ProfileResponse>('/api/v1/profile');
+}
+
+export function updateProfile(
+  api: ApiClient,
+  input: ProfileUpdateInput,
+): Promise<ProfileResponse> {
+  return api.put<ProfileResponse>('/api/v1/profile', input);
+}
+
+/**
+ * Irreversible: deletes the account and all its data server-side. The caller is
+ * responsible for clearing the local session afterwards — this call alone leaves
+ * the (now-revoked) access token sitting in storage.
+ */
+export function deleteAccount(api: ApiClient): Promise<void> {
+  return api.del<void>('/api/v1/profile');
 }

@@ -1,13 +1,23 @@
 import { useCallback, useMemo, useState } from 'react';
 import { createApiClient, type ApiClient } from '../api/client';
-import { login as loginRequest, logout as logoutRequest } from '../api/endpoints';
+import {
+  login as loginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
+} from '../api/endpoints';
 import { localTokenStore } from './tokenStorage';
 
 export interface AuthState {
   api: ApiClient;
   isAuthenticated: boolean;
   signIn(email: string, password: string): Promise<void>;
+  signUp(email: string, password: string, fullName: string): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * Drops the local session without calling the logout endpoint. For callers that
+   * have already invalidated the token server-side another way (account deletion).
+   */
+  clearSession(): void;
 }
 
 export function useAuth(): AuthState {
@@ -27,6 +37,13 @@ export function useAuth(): AuthState {
     setAuthenticated(true);
   }, []);
 
+  /** Registration returns a token pair just like login, so it signs the user in too. */
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+    const auth = await registerRequest(email, password, fullName);
+    localTokenStore.set({ token: auth.token, refreshToken: auth.refreshToken });
+    setAuthenticated(true);
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await logoutRequest(api);
@@ -36,5 +53,10 @@ export function useAuth(): AuthState {
     }
   }, [api]);
 
-  return { api, isAuthenticated, signIn, signOut };
+  const clearSession = useCallback(() => {
+    localTokenStore.clear();
+    setAuthenticated(false);
+  }, []);
+
+  return { api, isAuthenticated, signIn, signUp, signOut, clearSession };
 }
