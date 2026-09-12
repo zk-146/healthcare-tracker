@@ -24,7 +24,7 @@
              resolves correctly in all IDEs (Eclipse, VS Code Java) and CI builds.
              The Spring Boot BOM manages a version too; override here if you need a newer patch. -->
         <lombok.version>1.18.48</lombok.version>
-        <spotless.version>2.43.0</spotless.version>
+        <spotless.version>3.10.2</spotless.version>
         <!-- Overrides the version the Spring Boot parent manages, keeping it explicit
              alongside the other pinned build-plugin versions. -->
         <jacoco.version>0.8.15</jacoco.version>
