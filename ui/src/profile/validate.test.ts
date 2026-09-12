@@ -104,4 +104,26 @@ describe('validateDraft', () => {
     expect(errors[field]).toMatch(message);
     expect(input).toBeNull();
   });
+
+  // Regression tests: the backend's PUT can't clear a field back to null (see
+  // ProfileUpdateInput's doc comment) — blanking a field that was previously set must be
+  // rejected up front rather than silently omitted, or the save "succeeds" while the
+  // field quietly keeps its old value and the form reverts with no explanation.
+  describe('clearing a previously-set optional field', () => {
+    it.each(['dateOfBirth', 'gender', 'heightCm', 'weightKg'] as const)(
+      'rejects blanking %s when the original profile had a value',
+      (field) => {
+        const { errors, input } = validateDraft(draft({ [field]: '' }), now, draft());
+        expect(errors[field]).toMatch(/can't be cleared/i);
+        expect(input).toBeNull();
+      },
+    );
+
+    it('still allows leaving an already-blank field blank', () => {
+      const original = draft({ dateOfBirth: '', gender: '', heightCm: '', weightKg: '' });
+      const { errors, input } = validateDraft(original, now, original);
+      expect(errors).toEqual({});
+      expect(input).toEqual({ fullName: 'Ada Lovelace' });
+    });
+  });
 });

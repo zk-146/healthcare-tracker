@@ -84,7 +84,7 @@ function ProfileForm({ api, profile, onDeleted, onPasswordChanged, now = new Dat
 
   async function handleSubmit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    const { errors: found, input } = validateDraft(draft, now);
+    const { errors: found, input } = validateDraft(draft, now, draftFrom(current));
     setErrors(found);
     setBanner(null);
     setSaved(false);

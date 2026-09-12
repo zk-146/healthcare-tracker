@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '../api/client';
 import { listAllActivities } from '../api/endpoints';
 import type { ActivityFilters, ActivityResponse, ActivitySource, ActivityType, Page } from '../api/types';
@@ -70,6 +70,12 @@ export function WorkoutsPage({
   const [editing, setEditing] = useState<ActivityResponse | null>(null);
   const [filters, setFilters] = useState<ActivityFilters>({});
 
+  // Bumped by every action that starts a fresh query (refetch/setFilter/clearFilters).
+  // loadMore captures this before its request and only commits if it still matches when
+  // the request resolves -- otherwise the filters/reloadKey changed mid-flight and the
+  // response belongs to a query the user has since moved on from.
+  const queryTokenRef = useRef(0);
+
   const first = useLoadable<Page<ActivityResponse>>(
     () => listAllActivities(api, 0, filters),
     [api, reloadKey, filters],
@@ -85,6 +91,7 @@ export function WorkoutsPage({
 
   /** Reset to a single fresh page 0 — the simplest correct thing after a mutation. */
   function refetch(): void {
+    queryTokenRef.current += 1;
     setRows([]);
     setPage(0);
     setMoreError(null);
@@ -92,17 +99,29 @@ export function WorkoutsPage({
   }
 
   async function loadMore(): Promise<void> {
+    const token = queryTokenRef.current;
+    const filtersAtRequest = filters;
     setLoadingMore(true);
     setMoreError(null);
     try {
-      const next = await listAllActivities(api, page + 1, filters);
+      const next = await listAllActivities(api, page + 1, filtersAtRequest);
+      if (queryTokenRef.current !== token) {
+        // filters/reloadKey changed while this request was in flight (the user
+        // switched a filter or triggered a refetch) — this page belongs to a query
+        // that's no longer current, so applying it would corrupt the fresh row list.
+        return;
+      }
       setRows((current) => [...current, ...next.content]);
       setPage(next.number);
       setTotalPages(next.totalPages);
     } catch (cause: unknown) {
-      setMoreError(messageFor(cause));
+      if (queryTokenRef.current === token) {
+        setMoreError(messageFor(cause));
+      }
     } finally {
-      setLoadingMore(false);
+      if (queryTokenRef.current === token) {
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -113,6 +132,7 @@ export function WorkoutsPage({
   /** Mirrors refetch()'s clear-before-reload: without it, the stale (pre-filter) rows
    *  would sit alongside the loading skeleton until the filtered page resolves. */
   function setFilter<K extends keyof ActivityFilters>(key: K, value: string): void {
+    queryTokenRef.current += 1;
     setRows([]);
     setMoreError(null);
     setFilters((current) => {
@@ -127,6 +147,7 @@ export function WorkoutsPage({
   }
 
   function clearFilters(): void {
+    queryTokenRef.current += 1;
     setRows([]);
     setMoreError(null);
     setFilters({});

@@ -42,15 +42,39 @@ function parseNumeric(raw: string, rule: NumericRule): number | null {
   return value;
 }
 
+/** validateDraft's default `original` when the caller has no baseline to compare
+ *  against (e.g. existing tests) — every field reads as "never set", so the
+ *  can't-clear guard below never fires for them. */
+const NO_BASELINE: ProfileDraft = {
+  fullName: '',
+  dateOfBirth: '',
+  gender: '',
+  heightCm: '',
+  weightKg: '',
+};
+
+/**
+ * The backend's PUT is a partial update: an omitted field is left unchanged, and
+ * there is no way to send "clear this field back to null" (see ProfileUpdateInput's
+ * doc comment). Blanking an optional field that currently has a value would
+ * therefore silently no-op — the save "succeeds", the server's response still
+ * carries the old value, and the form reverts to it right under a "Saved." message
+ * with no explanation. Rejecting the attempt up front, with a clear message, is far
+ * better than that silent round-trip.
+ */
+const CANNOT_CLEAR_MESSAGE = "Can't be cleared here once set — enter a new value instead.";
+
 /**
  * Validates and narrows a draft to a ProfileUpdateInput. Every field is optional on
  * the wire (a partial update), so an empty field is simply omitted rather than
  * rejected — except fullName, which the backend requires to be non-blank whenever a
- * profile exists at all.
+ * profile exists at all, and the four fields below when `original` shows they were
+ * previously set (see CANNOT_CLEAR_MESSAGE).
  */
 export function validateDraft(
   draft: ProfileDraft,
   now: Date,
+  original: ProfileDraft = NO_BASELINE,
 ): { errors: FieldErrors; input: ProfileUpdateInput | null } {
   const errors: FieldErrors = {};
   const fullName = draft.fullName.trim();
@@ -66,12 +90,20 @@ export function validateDraft(
   // comparing, and parse dateOfBirth with a local (not UTC-midnight) time-of-day, same as
   // WorkoutForm's startedAt.
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (draft.dateOfBirth.trim() !== '' && new Date(`${draft.dateOfBirth}T00:00:00`) >= today) {
+  if (draft.dateOfBirth.trim() === '') {
+    if (original.dateOfBirth.trim() !== '') {
+      errors.dateOfBirth = CANNOT_CLEAR_MESSAGE;
+    }
+  } else if (new Date(`${draft.dateOfBirth}T00:00:00`) >= today) {
     errors.dateOfBirth = 'Date of birth must be in the past';
   }
 
   const gender = draft.gender.trim();
-  if (gender.length > 20) {
+  if (gender === '') {
+    if (original.gender.trim() !== '') {
+      errors.gender = CANNOT_CLEAR_MESSAGE;
+    }
+  } else if (gender.length > 20) {
     errors.gender = 'Gender must not exceed 20 characters';
   }
 
@@ -79,6 +111,9 @@ export function validateDraft(
   for (const key of ['heightCm', 'weightKg'] as const) {
     const raw = draft[key];
     if (raw.trim() === '') {
+      if (original[key].trim() !== '') {
+        errors[key] = CANNOT_CLEAR_MESSAGE;
+      }
       continue;
     }
     const value = parseNumeric(raw, NUMERIC_RULES[key]);
