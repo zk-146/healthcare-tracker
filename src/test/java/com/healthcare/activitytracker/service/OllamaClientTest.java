@@ -86,6 +86,20 @@ class OllamaClientTest {
   }
 
   @Test
+  void generateJson_isDeterministic() {
+    client().generateJson("Extract mood");
+    assertThat(lastRequestBody.get()).contains("\"temperature\":0.0").contains("\"seed\":42");
+  }
+
+  @Test
+  void generate_usesConfiguredTemperature_withoutSeed() {
+    OllamaProperties props = props();
+    props.setTemperature(0.7);
+    new OllamaClient(props, new ObjectMapper()).generate("Summarize my week");
+    assertThat(lastRequestBody.get()).contains("\"temperature\":0.7").doesNotContain("\"seed\"");
+  }
+
+  @Test
   void generate_returnsEmpty_whenDisabled() {
     OllamaProperties props = props();
     props.setEnabled(false);
