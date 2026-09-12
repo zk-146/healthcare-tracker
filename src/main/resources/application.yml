@@ -132,6 +132,9 @@ app:
     enabled: ${OLLAMA_ENABLED:true}
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:qwen2.5:14b}
+    # Prose sampling temperature. JSON generations ignore this and always run at 0 + fixed seed.
+    temperature: ${OLLAMA_TEMPERATURE:0.7}
+    seed: ${OLLAMA_SEED:42}
     connect-timeout-ms: 3000
     read-timeout-ms: ${OLLAMA_READ_TIMEOUT_MS:120000}
   kafka:
