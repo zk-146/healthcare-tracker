@@ -5,6 +5,7 @@ import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.repository.ActivityRepository;
+import com.healthcare.activitytracker.repository.DeepSeekConnectionRepository;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
 import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
@@ -23,16 +24,19 @@ public class ProfileService {
   private final ActivityRepository activityRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final StreakMilestoneRepository streakMilestoneRepository;
+  private final DeepSeekConnectionRepository deepSeekConnectionRepository;
 
   public ProfileService(
       UserRepository userRepository,
       ActivityRepository activityRepository,
       RefreshTokenRepository refreshTokenRepository,
-      StreakMilestoneRepository streakMilestoneRepository) {
+      StreakMilestoneRepository streakMilestoneRepository,
+      DeepSeekConnectionRepository deepSeekConnectionRepository) {
     this.userRepository = userRepository;
     this.activityRepository = activityRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.streakMilestoneRepository = streakMilestoneRepository;
+    this.deepSeekConnectionRepository = deepSeekConnectionRepository;
   }
 
   /**
@@ -80,8 +84,8 @@ public class ProfileService {
   }
 
   /**
-   * Permanently deletes the user's account and all associated data: activities, refresh tokens, and
-   * streak milestones. Irreversible (GDPR/right-to-erasure).
+   * Permanently deletes the user's account and all associated data: activities, refresh tokens,
+   * streak milestones, and any DeepSeek connection. Irreversible (GDPR/right-to-erasure).
    *
    * @param userId the authenticated user's ID
    * @throws com.healthcare.activitytracker.exception.ResourceNotFoundException if the user does not
@@ -97,6 +101,11 @@ public class ProfileService {
     int tokens = refreshTokenRepository.deleteAllByUserId(userId);
     int milestones = streakMilestoneRepository.deleteAllByUserId(userId);
     int activities = activityRepository.deleteAllByUserId(userId);
+    // Not GoogleHealthConnection: that table's own @OneToOne to User predates this deletion path
+    // and has the same gap already, tracked separately — not something to paper over here.
+    // DeepSeekConnection is new as of this change, so its own FK would otherwise turn every
+    // account deletion for a user with a saved key into a constraint-violation 500.
+    deepSeekConnectionRepository.deleteAllByUserId(userId);
     userRepository.delete(user);
 
     log.info(

@@ -5,7 +5,9 @@ import {
   createActivity,
   deleteAccount,
   deleteActivity,
+  disconnectDeepSeek,
   disconnectGoogleHealth,
+  getDeepSeekStatus,
   getDigest,
   getGoogleHealthConnectUrl,
   getMilestones,
@@ -17,6 +19,7 @@ import {
   listAllActivities,
   login,
   register,
+  saveDeepSeekApiKey,
   updateActivity,
   updateProfile,
 } from './endpoints';
@@ -349,6 +352,36 @@ describe('google health integration endpoints', () => {
     await disconnectGoogleHealth(api);
 
     expect(api.del).toHaveBeenCalledWith('/api/v1/integrations/google-health');
+  });
+});
+
+describe('deepseek integration endpoints', () => {
+  it('fetches the connection status', async () => {
+    const api = spyClient();
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ connected: true });
+
+    const result = await getDeepSeekStatus(api);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/integrations/deepseek/status');
+    expect(result).toEqual({ connected: true });
+  });
+
+  it('saves the api key', async () => {
+    const api = spyClient();
+    (api.put as ReturnType<typeof vi.fn>).mockResolvedValue({ connected: true });
+
+    const result = await saveDeepSeekApiKey(api, 'sk-my-key');
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/integrations/deepseek', { apiKey: 'sk-my-key' });
+    expect(result).toEqual({ connected: true });
+  });
+
+  it('disconnects the integration', async () => {
+    const api = spyClient();
+
+    await disconnectDeepSeek(api);
+
+    expect(api.del).toHaveBeenCalledWith('/api/v1/integrations/deepseek');
   });
 });
 

@@ -40,13 +40,13 @@ public class NotesAnalysisService {
   private static final int MAX_PAIN_DESCRIPTION_LENGTH = 200;
 
   private final ActivityRepository activityRepository;
-  private final OllamaClient ollamaClient;
+  private final AiTextClient aiTextClient;
   private final ObjectMapper objectMapper;
 
   public NotesAnalysisService(
-      ActivityRepository activityRepository, OllamaClient ollamaClient, ObjectMapper objectMapper) {
+      ActivityRepository activityRepository, AiTextClient aiTextClient, ObjectMapper objectMapper) {
     this.activityRepository = activityRepository;
-    this.ollamaClient = ollamaClient;
+    this.aiTextClient = aiTextClient;
     this.objectMapper = objectMapper;
   }
 
@@ -66,7 +66,7 @@ public class NotesAnalysisService {
       return unavailable(activityId, NO_NOTES_MESSAGE);
     }
 
-    Optional<String> raw = ollamaClient.generateJson(buildPrompt(activity.getNotes()));
+    Optional<String> raw = aiTextClient.generateJson(userId, buildPrompt(activity.getNotes()));
     if (raw.isEmpty()) {
       return unavailable(activityId, UNAVAILABLE_MESSAGE);
     }

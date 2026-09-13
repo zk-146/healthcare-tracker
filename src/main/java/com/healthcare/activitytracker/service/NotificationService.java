@@ -21,7 +21,7 @@ public class NotificationService {
     // The email address is deliberately NOT logged (HIPAA/PII policy: identifiers only).
     // A real delivery integration should resolve the address at send time. The generated
     // message contains no personal data by construction (the prompt carries no name/email).
-    String message = milestoneMessageService.milestoneMessage(streakDays);
+    String message = milestoneMessageService.milestoneMessage(user.getId(), streakDays);
     log.info(
         "NOTIFICATION userId={} type=STREAK_MILESTONE streakDays={} triggeringActivityId={} message=\"{}\"",
         user.getId(),
