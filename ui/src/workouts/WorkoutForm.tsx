@@ -4,6 +4,7 @@ import { createActivity, deleteActivity, updateActivity } from '../api/endpoints
 import type { ActivityResponse, ActivityType } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
 import { ErrorNote } from '../ui/ErrorNote';
+import { NotesInsight } from './NotesInsight';
 import {
   draftFrom,
   emptyDraft,
@@ -206,6 +207,13 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
     }
   }
 
+  // The backend analyses the persisted notes, so only a saved workout with notes on
+  // record can be analysed. Blank-only notes are saved as empty, hence the trim.
+  const savedNotes =
+    initial !== undefined && initial.notes !== null && initial.notes.trim() !== ''
+      ? initial.notes
+      : null;
+
   const title = initial === undefined ? 'Log workout' : 'Edit workout';
 
   return (
@@ -326,6 +334,15 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   {draft.notes.length} / {NOTES_LIMIT}
                 </span>
               </Field>
+
+              {initial !== undefined && savedNotes !== null && (
+                <div className="field">
+                  <NotesInsight api={api} activityId={initial.id} />
+                  {draft.notes !== savedNotes && (
+                    <span className="field-hint">Analysis uses your saved notes.</span>
+                  )}
+                </div>
+              )}
             </>
           )}
 

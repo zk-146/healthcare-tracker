@@ -187,6 +187,16 @@ describe('WorkoutForm — create mode', () => {
     await user.tab();
     expect(document.activeElement).toBe(first);
   });
+
+  it('does not offer notes analysis for a workout that is not saved yet', async () => {
+    const user = userEvent.setup();
+    render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    await user.click(screen.getByRole('button', { name: 'More details' }));
+    await user.type(screen.getByLabelText('Notes'), 'felt great');
+
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+  });
 });
 
 describe('WorkoutForm — edit mode', () => {
@@ -312,5 +322,56 @@ describe('WorkoutForm — edit mode', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
 
     expect(screen.queryByRole('button', { name: 'Delete this workout' })).not.toBeInTheDocument();
+  });
+
+  it('offers notes analysis for a saved workout that has notes', () => {
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: 'Knee felt sore on the climb' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Analyze notes' })).toBeInTheDocument();
+    expect(screen.queryByText('Analysis uses your saved notes.')).not.toBeInTheDocument();
+  });
+
+  it('does not offer notes analysis when the saved notes are empty or blank', () => {
+    const { unmount } = render(
+      <WorkoutForm api={fakeApi()} initial={existing} onClose={vi.fn()} onSaved={vi.fn()} now={now} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: '   ' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+  });
+
+  it('warns that analysis uses the saved notes once the notes are edited', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: 'Knee felt sore on the climb' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Notes'), ' again');
+
+    expect(screen.getByText('Analysis uses your saved notes.')).toBeInTheDocument();
   });
 });
