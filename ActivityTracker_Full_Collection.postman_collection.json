@@ -565,6 +565,28 @@
       ]
     },
     {
+      "name": "Milestones",
+      "item": [
+        {
+          "name": "Milestone progress",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/milestones/progress"
+          }
+        }
+      ]
+    },
+    {
       "name": "Health",
       "item": [
         {

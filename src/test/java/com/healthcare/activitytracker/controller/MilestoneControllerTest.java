@@ -1,6 +1,8 @@
 package com.healthcare.activitytracker.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,12 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.healthcare.activitytracker.config.SecurityConfig;
+import com.healthcare.activitytracker.model.dto.MilestoneProgressResponse;
 import com.healthcare.activitytracker.model.dto.MilestoneResponse;
 import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.MilestoneService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -80,5 +85,56 @@ class MilestoneControllerTest {
   @Test
   void list_returns401_whenUnauthenticated() throws Exception {
     mockMvc.perform(get("/api/v1/milestones")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void progress_returns200_withTheLadderAndNextRung() throws Exception {
+    when(milestoneService.getProgress(any(), any()))
+        .thenReturn(
+            MilestoneProgressResponse.builder()
+                .currentStreak(12)
+                .nextThreshold(14)
+                .daysRemaining(2)
+                .progress(12 / 14.0)
+                .ladder(List.of(3, 7, 14, 30, 60, 100, 365))
+                .build());
+
+    mockMvc
+        .perform(get("/api/v1/milestones/progress").with(uuidUser()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.currentStreak").value(12))
+        .andExpect(jsonPath("$.nextThreshold").value(14))
+        .andExpect(jsonPath("$.daysRemaining").value(2))
+        .andExpect(jsonPath("$.ladder.length()").value(7));
+  }
+
+  @Test
+  void progress_resolvesTheUserTimezoneHeader() throws Exception {
+    when(milestoneService.getProgress(any(), any()))
+        .thenReturn(MilestoneProgressResponse.builder().currentStreak(5).build());
+
+    mockMvc
+        .perform(
+            get("/api/v1/milestones/progress")
+                .header("X-User-Timezone", "America/New_York")
+                .with(uuidUser()))
+        .andExpect(status().isOk());
+
+    verify(milestoneService).getProgress(any(), eq(ZoneId.of("America/New_York")));
+  }
+
+  @Test
+  void progress_defaultsToUtc_whenTimezoneHeaderIsAbsent() throws Exception {
+    when(milestoneService.getProgress(any(), any()))
+        .thenReturn(MilestoneProgressResponse.builder().currentStreak(5).build());
+
+    mockMvc.perform(get("/api/v1/milestones/progress").with(uuidUser())).andExpect(status().isOk());
+
+    verify(milestoneService).getProgress(any(), eq(ZoneOffset.UTC));
+  }
+
+  @Test
+  void progress_returns401_whenUnauthenticated() throws Exception {
+    mockMvc.perform(get("/api/v1/milestones/progress")).andExpect(status().isUnauthorized());
   }
 }
