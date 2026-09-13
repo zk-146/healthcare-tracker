@@ -24,6 +24,20 @@
         Nothing else is suppressed here. The swagger-ui DOMPurify CVEs, CVE-2026-65898
         among them, used to need an entry; they are fixed properly now by pinning
         org.webjars:swagger-ui to 5.32.14 in pom.xml, which bundles DOMPurify 3.4.13.
+
+        ===
+
+        2026-09-13 batch: 8 more CVEs against the same three unpublished-fix lines
+        (spring-core 6.2.19 -> 6.2.20, spring-data-jpa 3.5.13 -> 3.5.14, spring-security-core
+        6.5.11 -> 6.5.12), all announced 2026-08-20. Checked via spring.io/security: the OSS
+        fix for each now exists one line up (Spring Framework 7.0.9, Spring Data 4.0.7/4.1.1,
+        Spring Security 7.0.7/7.1.1) but 6.2.20/3.5.14/6.5.12 themselves are enterprise-support
+        only (Tanzu Spring), same as the CVEs above. That upgrade path is the Spring Boot 4.x
+        migration already tracked separately, not a same-line patch we can pull today.
+
+        Same rule as above: suppressed on the ground that this application does not exercise
+        the vulnerable feature, verified against src/main for each entry below, not merely
+        because no free fix exists.
     -->
 
     <!-- ===== Spring Framework 6.2.19 (OSS fix only in 7.0.9 / Spring Boot 4.x) ===== -->
@@ -179,5 +193,100 @@
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-59270</cve>
+    </suppress>
+
+    <!-- ===== 2026-09-13 batch: Spring Framework 6.2.19 (OSS fix only in 7.0.9 / Spring Boot 4.x) ===== -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Open redirect in UrlHandlerFilter when configured with broadly matching patterns.
+            This application registers no UrlHandlerFilter: no WebMvcConfigurer bean and no
+            reference to UrlHandlerFilter anywhere in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47883</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Open redirect via UrlFileNameViewController mapped with an end-of-path pattern and
+            no configured prefix. This application uses no UrlFileNameViewController: routing
+            is annotated @RestController methods only.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-47887</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Reflected XSS when a data-binding Errors instance with HTML escaping enabled is
+            rendered via Errors.getFieldErrors()/getFieldError(). GlobalExceptionHandler does
+            call ex.getBindingResult().getFieldErrors() (GlobalExceptionHandler.java), but it is
+            a @RestControllerAdvice serialising the result to JSON via Jackson -- there is no
+            HTML view rendering and no HTML-escaping Errors context anywhere in this app for the
+            payload to reach.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-59281</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Path traversal via Spring's FreeMarker integration when a controller returns an
+            untrusted view name resolved through SpringTemplateLoader. This application has no
+            FreeMarker dependency and renders no views at all -- it is a JSON REST API.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-59280</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            HTTP response splitting when a Content-Disposition header is built from untrusted
+            input (e.g. a malicious file name). This application never sets a Content-Disposition
+            header: no attachment/filename response header anywhere in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-.*@.*$</packageUrl>
+        <cve>CVE-2026-59314</cve>
+    </suppress>
+
+    <!-- ===== 2026-09-13 batch: Spring Data JPA 3.5.13 (OSS fix only in 4.0.7/4.1.1 / Spring Boot 4.x) ===== -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Sort validation bypass allowing inference of data via crafted sort payloads -- but
+            per the advisory this requires a repository method that combines nativeQuery=true
+            with a Sort/Pageable parameter. The only native query in this app,
+            OutboxEventRepository.claimPending(int limit), takes no Sort/Pageable at all and its
+            "limit" argument is an internal poll-batch-size config value, never request input.
+            The one method that does accept Pageable, ActivityRepository.findByFilters, backs a
+            plain JPQL @Query, not a native one.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.data/spring-data-jpa@.*$</packageUrl>
+        <cve>CVE-2026-47834</cve>
+    </suppress>
+
+    <!-- ===== 2026-09-13 batch: Spring Security 6.5.11 (OSS fix only in 7.0.7/7.1.1 / Spring Boot 4.x) ===== -->
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            AesBytesEncryptor's two-argument constructor (or a null IV generator with CBC mode)
+            encrypts with an all-zero IV. This application never uses Spring Security's crypto
+            module: no Encryptors/BytesEncryptor/TextEncryptor reference anywhere in src/main.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
+        <cve>CVE-2026-47842</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            Non-constant-time comparison of security-sensitive values in DigestAuthenticationFilter,
+            KeyBasedPersistenceTokenService (remember-me), the Password4j-backed password
+            encoders, and InMemoryOAuth2AuthorizationService. This application uses none of the
+            four: authentication is BCryptPasswordEncoder plus stateless JWT Bearer tokens, with
+            no digest auth, no remember-me, and no OAuth2 authorization server component.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
+        <cve>CVE-2026-59276</cve>
     </suppress>
 </suppressions>
