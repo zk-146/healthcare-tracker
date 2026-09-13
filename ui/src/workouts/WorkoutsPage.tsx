@@ -3,12 +3,13 @@ import type { ApiClient } from '../api/client';
 import { listAllActivities } from '../api/endpoints';
 import type { ActivityFilters, ActivityResponse, ActivitySource, ActivityType, Page } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
-import { toDayKey } from '../lib/days';
+import { useToday } from '../lib/useToday';
 import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
 import { ImportCsvDialog } from './ImportCsvDialog';
+import { filterDatesError } from './validate';
 import { TYPE_LABELS, WorkoutForm } from './WorkoutForm';
 
 /** MANUAL rows carry no badge: that is the default and would be noise on every row. */
@@ -46,6 +47,14 @@ function metricOf(activity: ActivityResponse): string | null {
   return null;
 }
 
+const EMPTY_PAGE: Page<ActivityResponse> = {
+  content: [],
+  totalElements: 0,
+  totalPages: 0,
+  number: 0,
+  size: 20,
+};
+
 interface WorkoutsPageProps {
   api: ApiClient;
   /** Owned by App, because the trigger buttons live in the shared header. */
@@ -70,9 +79,9 @@ export function WorkoutsPage({
   const [moreError, setMoreError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ActivityResponse | null>(null);
   const [filters, setFilters] = useState<ActivityFilters>({});
-  // No workout can start in the future, so the pickers don't offer those days. Recomputed
-  // every render so a page left open past midnight still offers the new day.
-  const today = toDayKey(new Date());
+  // No workout can start in the future, so the pickers don't offer those days.
+  const today = useToday();
+  const filterError = filterDatesError(filters.from, filters.to, today);
 
   // Bumped by every action that starts a fresh query (refetch/setFilter/clearFilters).
   // loadMore captures this before its request and only commits if it still matches when
@@ -81,8 +90,10 @@ export function WorkoutsPage({
   const queryTokenRef = useRef(0);
 
   const first = useLoadable<Page<ActivityResponse>>(
-    () => listAllActivities(api, 0, filters),
-    [api, reloadKey, filters],
+    // An invalid date pair can only match nothing, so skip the round trip; the render
+    // below shows filterError instead of the (empty) result.
+    () => (filterError === null ? listAllActivities(api, 0, filters) : Promise.resolve(EMPTY_PAGE)),
+    [api, reloadKey, filters, filterError],
   );
 
   useEffect(() => {
@@ -211,10 +222,12 @@ export function WorkoutsPage({
         )}
       </div>
 
-      {first.state === 'loading' && <Skeleton height={200} />}
-      {first.state === 'error' && <ErrorNote message={first.message} />}
+      {filterError !== null && <ErrorNote message={filterError} />}
 
-      {first.state === 'ready' && rows.length === 0 && (
+      {filterError === null && first.state === 'loading' && <Skeleton height={200} />}
+      {filterError === null && first.state === 'error' && <ErrorNote message={first.message} />}
+
+      {filterError === null && first.state === 'ready' && rows.length === 0 && (
         <Card>
           <p className="empty-note">
             {hasActiveFilters ? 'No workouts match these filters.' : 'No workouts logged yet.'}
@@ -222,7 +235,7 @@ export function WorkoutsPage({
         </Card>
       )}
 
-      {rows.length > 0 && (
+      {filterError === null && rows.length > 0 && (
         <Card title="All workouts">
           <ul className="workout-list">
             {rows.map((row) => {

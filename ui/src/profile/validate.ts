@@ -65,6 +65,24 @@ const NO_BASELINE: ProfileDraft = {
 const CANNOT_CLEAR_MESSAGE = "Can't be cleared here once set — enter a new value instead.";
 
 /**
+ * The "must be in the past" rule alone, so ProfilePage can apply it as the date is
+ * entered (a typed date bypasses the picker's max). An empty value returns undefined:
+ * whether blank is allowed depends on the saved profile, which only validateDraft knows.
+ *
+ * The backend's @Past on a LocalDate compares whole dates, not instants — today's date
+ * is rejected regardless of time of day. Match that here: zero out `now`'s time before
+ * comparing, and parse dateOfBirth with a local (not UTC-midnight) time-of-day, same as
+ * WorkoutForm's startedAt.
+ */
+export function dateOfBirthError(dateOfBirth: string, now: Date): string | undefined {
+  if (dateOfBirth.trim() === '') {
+    return undefined;
+  }
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return new Date(`${dateOfBirth}T00:00:00`) >= today ? 'Date of birth must be in the past' : undefined;
+}
+
+/**
  * Validates and narrows a draft to a ProfileUpdateInput. Every field is optional on
  * the wire (a partial update), so an empty field is simply omitted rather than
  * rejected — except fullName, which the backend requires to be non-blank whenever a
@@ -85,17 +103,15 @@ export function validateDraft(
     errors.fullName = 'Full name cannot exceed 150 characters';
   }
 
-  // The backend's @Past on a LocalDate compares whole dates, not instants — today's date
-  // is rejected regardless of time of day. Match that here: zero out `now`'s time before
-  // comparing, and parse dateOfBirth with a local (not UTC-midnight) time-of-day, same as
-  // WorkoutForm's startedAt.
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (draft.dateOfBirth.trim() === '') {
     if (original.dateOfBirth.trim() !== '') {
       errors.dateOfBirth = CANNOT_CLEAR_MESSAGE;
     }
-  } else if (new Date(`${draft.dateOfBirth}T00:00:00`) >= today) {
-    errors.dateOfBirth = 'Date of birth must be in the past';
+  } else {
+    const dobError = dateOfBirthError(draft.dateOfBirth, now);
+    if (dobError !== undefined) {
+      errors.dateOfBirth = dobError;
+    }
   }
 
   const gender = draft.gender.trim();

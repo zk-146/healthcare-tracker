@@ -10,7 +10,13 @@ import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
 import { AiSettingsCard } from './AiSettingsCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
-import { draftFrom, validateDraft, type FieldErrors, type ProfileDraft } from './validate';
+import {
+  dateOfBirthError,
+  draftFrom,
+  validateDraft,
+  type FieldErrors,
+  type ProfileDraft,
+} from './validate';
 
 const CONFLICT_MESSAGE = 'Your profile changed elsewhere. Reload the page and try again.';
 
@@ -94,6 +100,21 @@ function ProfileForm({
     setSaved(false);
   }
 
+  /** A typed date bypasses the picker's max, so apply the past-date rule as it's entered. */
+  function setDateOfBirth(value: string): void {
+    set('dateOfBirth', value);
+    const error = dateOfBirthError(value, now);
+    setErrors((current) => {
+      const next = { ...current };
+      if (error === undefined) {
+        delete next.dateOfBirth;
+      } else {
+        next.dateOfBirth = error;
+      }
+      return next;
+    });
+  }
+
   async function handleSubmit(event: FormEvent): Promise<void> {
     event.preventDefault();
     const { errors: found, input } = validateDraft(draft, now, draftFrom(current));
@@ -165,7 +186,7 @@ function ProfileForm({
               // Must be strictly in the past (backend @Past), so today is excluded too.
               max={toDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))}
               value={draft.dateOfBirth}
-              onChange={(event) => set('dateOfBirth', event.target.value)}
+              onChange={(event) => setDateOfBirth(event.target.value)}
               aria-invalid={errors.dateOfBirth !== undefined}
               aria-describedby={errors.dateOfBirth !== undefined ? 'dateOfBirth-error' : undefined}
             />

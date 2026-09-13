@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type ApiClient } from '../api/client';
@@ -41,6 +41,21 @@ describe('ProfilePage', () => {
     const today = new Date();
     const yesterday = toDayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
     expect(await screen.findByLabelText('Date of birth')).toHaveAttribute('max', yesterday);
+  });
+
+  it('flags a future date of birth as soon as it is entered, and clears it once corrected', async () => {
+    const api = stubApi();
+    render(<ProfilePage api={api} onAccountDeleted={vi.fn()} onPasswordChanged={vi.fn()} />);
+    const dateOfBirth = await screen.findByLabelText('Date of birth');
+
+    fireEvent.change(dateOfBirth, { target: { value: '2999-01-01' } });
+
+    expect(screen.getByText('Date of birth must be in the past')).toBeInTheDocument();
+    expect(api.put).not.toHaveBeenCalled();
+
+    fireEvent.change(dateOfBirth, { target: { value: '1991-02-03' } });
+
+    expect(screen.queryByText('Date of birth must be in the past')).not.toBeInTheDocument();
   });
 
   it('loads and displays the current profile', async () => {

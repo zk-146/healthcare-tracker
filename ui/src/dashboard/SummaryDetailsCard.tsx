@@ -5,6 +5,7 @@ import type { DigestResponse, SummaryPeriod } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
 import { toDayKey } from '../lib/days';
 import type { Loadable } from '../lib/useLoadable';
+import { useToday } from '../lib/useToday';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
@@ -31,9 +32,10 @@ interface SummaryDetailsCardProps {
 export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
   const [selection, setSelection] = useState<Selection>('weekly');
   // Kept across selection changes so flipping to Week and back doesn't lose the dates.
-  // Recomputed every render, not frozen at mount: a card left open past midnight must
-  // accept the new day.
-  const today = toDayKey(now ?? new Date());
+  // useToday rolls over at midnight even if nothing re-renders the card; an injected
+  // `now` (tests) takes precedence.
+  const liveToday = useToday();
+  const today = now === undefined ? liveToday : toDayKey(now);
   const [range, setRange] = useState<DateRange>(() => defaultRange(now ?? new Date()));
   const [digest, setDigest] = useState<Loadable<DigestResponse> | null>(null);
 

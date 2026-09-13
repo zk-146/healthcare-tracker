@@ -1,4 +1,4 @@
-﻿import { render, screen, waitFor } from '@testing-library/react';
+﻿import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../api/client';
@@ -64,23 +64,29 @@ describe('WorkoutsPage', () => {
     expect(screen.getByLabelText('To')).toHaveAttribute('max', toDayKey(new Date()));
   });
 
-  it('moves the filter cap forward when the day changes while the page stays open', async () => {
-    // Only Date is faked, so Testing Library's own timers keep running.
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-      vi.setSystemTime(new Date(2026, 8, 13, 23, 59));
-      const api = apiWithPages({ 0: pageOf([activity()]) });
-      render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
-      await screen.findByText(rowType('Cycling'));
-      expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-13');
+  it('explains a future filter date instead of showing an empty list, and fetches nothing', async () => {
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
+    await screen.findByText(rowType('Cycling'));
+    (api.get as ReturnType<typeof vi.fn>).mockClear();
 
-      vi.setSystemTime(new Date(2026, 8, 14, 0, 1));
-      await userEvent.selectOptions(screen.getByLabelText('Type'), 'CYCLING');
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2999-01-01' } });
 
-      expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-14');
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(await screen.findByText("From date can't be in the future.")).toBeInTheDocument();
+    expect(screen.queryByText('No workouts match these filters.')).not.toBeInTheDocument();
+    expect(screen.queryByText(rowType('Cycling'))).not.toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('explains a From date after the To date', async () => {
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
+    await screen.findByText(rowType('Cycling'));
+
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-09-05' } });
+
+    expect(await screen.findByText('From date must be on or before To date.')).toBeInTheDocument();
   });
 
   it('renders a row per activity once the first page resolves', async () => {

@@ -137,6 +137,28 @@ export function startedAtError(startedAt: string, now: Date): string | undefined
   return undefined;
 }
 
+/**
+ * The history filters' date pair, both optional. Without this, a future or reversed
+ * pair just shows "No workouts match", which reads as missing data rather than a typo.
+ * Day keys are zero-padded YYYY-MM-DD, so they order correctly as strings.
+ */
+export function filterDatesError(
+  from: string | undefined,
+  to: string | undefined,
+  today: string,
+): string | null {
+  if (from !== undefined && from > today) {
+    return "From date can't be in the future.";
+  }
+  if (to !== undefined && to > today) {
+    return "To date can't be in the future.";
+  }
+  if (from !== undefined && to !== undefined && from > to) {
+    return 'From date must be on or before To date.';
+  }
+  return null;
+}
+
 export function validateDraft(
   draft: WorkoutDraft,
   now: Date,
