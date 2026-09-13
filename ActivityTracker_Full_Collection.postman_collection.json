@@ -335,6 +335,24 @@
       ]
     },
     {
+      "name": "Activity Types",
+      "item": [
+        {
+          "name": "List activity types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/activity-types"
+          }
+        }
+      ]
+    },
+    {
       "name": "Google Health Integration",
       "item": [
         {
