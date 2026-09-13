@@ -5,6 +5,7 @@ import com.healthcare.activitytracker.model.entity.User;
 import com.healthcare.activitytracker.model.event.ActivityCreatedEvent;
 import com.healthcare.activitytracker.repository.StreakMilestoneRepository;
 import com.healthcare.activitytracker.repository.UserRepository;
+import com.healthcare.activitytracker.util.MilestoneThresholds;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -33,9 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActivityEventConsumer {
 
   private static final Logger log = LoggerFactory.getLogger(ActivityEventConsumer.class);
-
-  /** Ascending — the order is relied upon when picking the highest threshold crossed. */
-  private static final List<Integer> MILESTONE_THRESHOLDS = List.of(3, 7, 14, 30, 60, 100, 365);
 
   private final SummaryService summaryService;
   private final StreakMilestoneRepository milestoneRepository;
@@ -79,7 +77,7 @@ public class ActivityEventConsumer {
     // import or the Google Health initial backfill does. A 31-day backfill would
     // award nothing at all, because 31 is not itself a threshold.
     List<Integer> newlyReached =
-        MILESTONE_THRESHOLDS.stream()
+        MilestoneThresholds.ALL.stream()
             .filter(threshold -> threshold <= streak)
             .filter(
                 threshold ->
