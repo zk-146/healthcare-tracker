@@ -14,10 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Static metadata about the selectable activity types. A top-level resource rather than
- * {@code /activities/types}: it is not a sub-resource of the activities collection, and keeping it
- * away from {@code GET /activities/{id}} avoids reasoning about literal-vs-templated path
- * precedence.
+ * Static metadata about the selectable activity types. A top-level resource rather than {@code
+ * /activities/types}: it is not a sub-resource of the activities collection, and keeping it away
+ * from {@code GET /activities/{id}} avoids reasoning about literal-vs-templated path precedence.
  */
 @Tag(name = "Activity Types", description = "The selectable activity types and their MET values")
 @RestController

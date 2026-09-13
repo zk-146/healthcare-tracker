@@ -54,8 +54,7 @@ class ActivityTypeControllerTest {
     mockMvc
         .perform(get("/api/v1/activity-types").with(uuidUser()))
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$[?(@.name=='STRENGTH_TRAINING')].label").value("Strength Training"))
+        .andExpect(jsonPath("$[?(@.name=='STRENGTH_TRAINING')].label").value("Strength Training"))
         .andExpect(jsonPath("$[?(@.name=='YOGA')].label").value("Yoga"));
   }
 
