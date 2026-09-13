@@ -17,6 +17,7 @@ import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.util.Collections;
 import java.util.UUID;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -112,5 +114,78 @@ class DeepSeekIntegrationControllerTest {
         .andExpect(status().isNoContent());
 
     verify(connectionService).disconnect(userId);
+  }
+
+  @Test
+  void status_reportsInactive_whenTheServerUsesTheDefaultProvider() throws Exception {
+    UUID userId = UUID.randomUUID();
+    when(connectionService.isConnected(userId)).thenReturn(true);
+
+    mockMvc
+        .perform(get("/api/v1/integrations/deepseek/status").with(uuidUser(userId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.connected").value(true))
+        .andExpect(jsonPath("$.active").value(false));
+  }
+
+  @Test
+  void save_reportsInactive_whenTheServerUsesTheDefaultProvider() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/integrations/deepseek")
+                .with(uuidUser(UUID.randomUUID()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of("apiKey", "sk-my-key"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.active").value(false));
+  }
+
+  @Nested
+  @TestPropertySource(properties = "app.ai.provider=deepseek")
+  class WhenTheServerUsesDeepSeek {
+
+    // Shadow the outer fields: those are injected from the outer class's context, which has the
+    // default provider, so using them would silently ignore this class's property override.
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+
+    @Test
+    void status_reportsActive() throws Exception {
+      mockMvc
+          .perform(get("/api/v1/integrations/deepseek/status").with(uuidUser(UUID.randomUUID())))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void save_reportsActive() throws Exception {
+      mockMvc
+          .perform(
+              put("/api/v1/integrations/deepseek")
+                  .with(uuidUser(UUID.randomUUID()))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      objectMapper.writeValueAsString(java.util.Map.of("apiKey", "sk-my-key"))))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.active").value(true));
+    }
+  }
+
+  @Nested
+  @TestPropertySource(properties = "app.ai.provider=DeepSeek")
+  class WhenTheProviderValueIsUnrecognized {
+
+    // See WhenTheServerUsesDeepSeek for why these are redeclared.
+    @Autowired MockMvc mockMvc;
+
+    // Provider matching is exact (see NoopAiTextClient), so "DeepSeek" selects no client at all
+    // and a saved key is not used; the status must not claim otherwise.
+    @Test
+    void status_reportsInactive() throws Exception {
+      mockMvc
+          .perform(get("/api/v1/integrations/deepseek/status").with(uuidUser(UUID.randomUUID())))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.active").value(false));
+    }
   }
 }

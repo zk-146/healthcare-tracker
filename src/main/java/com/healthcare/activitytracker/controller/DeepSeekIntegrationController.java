@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,17 +30,28 @@ public class DeepSeekIntegrationController {
 
   private final DeepSeekConnectionService connectionService;
 
-  public DeepSeekIntegrationController(DeepSeekConnectionService connectionService) {
+  /**
+   * Whether {@code DeepSeekClient} is the active {@code AiTextClient}. Mirrors its exact,
+   * case-sensitive {@code @ConditionalOnProperty} match, so a typo that falls through to {@code
+   * NoopAiTextClient} is reported as inactive too.
+   */
+  private final boolean active;
+
+  public DeepSeekIntegrationController(
+      DeepSeekConnectionService connectionService,
+      @Value("${app.ai.provider:ollama}") String aiProvider) {
     this.connectionService = connectionService;
+    this.active = "deepseek".equals(aiProvider);
   }
 
-  /** Reports whether a key is on file. The key itself is never returned. */
+  /** Reports whether a key is on file and whether the server uses it. Never returns the key. */
   @Operation(summary = "Get DeepSeek integration status")
   @GetMapping("/status")
   public ResponseEntity<DeepSeekStatusResponse> status(Authentication auth) {
     UUID userId = (UUID) auth.getPrincipal();
     boolean connected = connectionService.isConnected(userId);
-    return ResponseEntity.ok(DeepSeekStatusResponse.builder().connected(connected).build());
+    return ResponseEntity.ok(
+        DeepSeekStatusResponse.builder().connected(connected).active(active).build());
   }
 
   /** Saves (or replaces) the current user's DeepSeek API key. */
@@ -49,7 +61,8 @@ public class DeepSeekIntegrationController {
       Authentication auth, @Valid @RequestBody DeepSeekApiKeyRequest request) {
     UUID userId = (UUID) auth.getPrincipal();
     connectionService.saveApiKey(userId, request.getApiKey());
-    return ResponseEntity.ok(DeepSeekStatusResponse.builder().connected(true).build());
+    return ResponseEntity.ok(
+        DeepSeekStatusResponse.builder().connected(true).active(active).build());
   }
 
   /** Removes the current user's DeepSeek API key. */
