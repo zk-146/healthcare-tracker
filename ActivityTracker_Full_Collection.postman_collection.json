@@ -389,6 +389,19 @@
           }
         },
         {
+          "name": "Sync now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/integrations/google-health/sync"
+          }
+        },
+        {
           "name": "Disconnect",
           "request": {
             "method": "DELETE",

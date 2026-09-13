@@ -1,10 +1,15 @@
 package com.healthcare.activitytracker.controller;
 
 import com.healthcare.activitytracker.config.GoogleHealthProperties;
+import com.healthcare.activitytracker.exception.ResourceConflictException;
+import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.GoogleHealthStatusResponse;
+import com.healthcare.activitytracker.model.dto.GoogleHealthSyncResponse;
 import com.healthcare.activitytracker.model.entity.GoogleHealthConnection;
 import com.healthcare.activitytracker.service.GoogleHealthConnectionService;
+import com.healthcare.activitytracker.service.GoogleHealthConnectionSyncer;
 import com.healthcare.activitytracker.service.GoogleHealthOAuthService;
+import com.healthcare.activitytracker.service.GoogleHealthOAuthService.RefreshTokenRevokedException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
@@ -16,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,14 +43,17 @@ public class GoogleHealthIntegrationController {
 
   private final GoogleHealthOAuthService oauthService;
   private final GoogleHealthConnectionService connectionService;
+  private final GoogleHealthConnectionSyncer syncer;
   private final GoogleHealthProperties properties;
 
   public GoogleHealthIntegrationController(
       GoogleHealthOAuthService oauthService,
       GoogleHealthConnectionService connectionService,
+      GoogleHealthConnectionSyncer syncer,
       GoogleHealthProperties properties) {
     this.oauthService = oauthService;
     this.connectionService = connectionService;
+    this.syncer = syncer;
     this.properties = properties;
   }
 
@@ -103,6 +112,37 @@ public class GoogleHealthIntegrationController {
     UUID userId = (UUID) auth.getPrincipal();
     connectionService.disconnect(userId);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Runs a sync immediately rather than waiting for the scheduled poll. Synchronous: it blocks on
+   * the Google API call and reports what it imported. Covered by the existing 60/min general API
+   * bucket in {@code RateLimitingFilter}.
+   */
+  @Operation(summary = "Trigger a Google Health sync now")
+  @PostMapping("/sync")
+  public ResponseEntity<GoogleHealthSyncResponse> sync(Authentication auth) {
+    requireEnabled();
+    UUID userId = (UUID) auth.getPrincipal();
+    GoogleHealthConnection connection =
+        connectionService
+            .findConnection(userId)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("No Google Health connection for this user"));
+
+    try {
+      int imported = syncer.syncConnection(connection);
+      return ResponseEntity.ok(
+          GoogleHealthSyncResponse.builder()
+              .imported(imported)
+              .lastSyncedAt(connection.getLastSyncedAt())
+              .build());
+    } catch (RefreshTokenRevokedException e) {
+      // The connection service has already flipped the status and notified; tell the caller to
+      // re-link rather than surfacing this as a 500.
+      throw new ResourceConflictException(
+          "Google Health authorization has expired; reconnect the integration");
+    }
   }
 
   private void requireEnabled() {
