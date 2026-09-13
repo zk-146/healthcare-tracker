@@ -6,6 +6,7 @@ import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.GoogleHealthStatusResponse;
 import com.healthcare.activitytracker.model.dto.GoogleHealthSyncResponse;
 import com.healthcare.activitytracker.model.entity.GoogleHealthConnection;
+import com.healthcare.activitytracker.model.enums.ConnectionStatus;
 import com.healthcare.activitytracker.service.GoogleHealthConnectionService;
 import com.healthcare.activitytracker.service.GoogleHealthConnectionSyncer;
 import com.healthcare.activitytracker.service.GoogleHealthOAuthService;
@@ -117,7 +118,8 @@ public class GoogleHealthIntegrationController {
   /**
    * Runs a sync immediately rather than waiting for the scheduled poll. Synchronous: it blocks on
    * the Google API call and reports what it imported. Covered by the existing 60/min general API
-   * bucket in {@code RateLimitingFilter}.
+   * bucket in {@code RateLimitingFilter}. Returns 409 without contacting Google when the connection
+   * already needs reconnecting.
    */
   @Operation(summary = "Trigger a Google Health sync now")
   @PostMapping("/sync")
@@ -129,6 +131,14 @@ public class GoogleHealthIntegrationController {
             .findConnection(userId)
             .orElseThrow(
                 () -> new ResourceNotFoundException("No Google Health connection for this user"));
+
+    // Mirror the scheduler, which only syncs CONNECTED rows. A NEEDS_RECONNECT connection keeps an
+    // expired token, so syncing it would call Google, fail, and re-send the reconnect reminder on
+    // every request.
+    if (connection.getStatus() != ConnectionStatus.CONNECTED) {
+      throw new ResourceConflictException(
+          "Google Health authorization has expired; reconnect the integration");
+    }
 
     try {
       int imported = syncer.syncConnection(connection);

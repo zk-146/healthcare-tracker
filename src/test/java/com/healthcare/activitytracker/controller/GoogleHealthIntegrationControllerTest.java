@@ -1,6 +1,7 @@
 package com.healthcare.activitytracker.controller;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -180,7 +181,8 @@ class GoogleHealthIntegrationControllerTest {
     mockMvc
         .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.imported").value(3));
+        .andExpect(jsonPath("$.imported").value(3))
+        .andExpect(jsonPath("$.lastSyncedAt").value("2026-09-13T08:00:00"));
   }
 
   @Test
@@ -218,7 +220,29 @@ class GoogleHealthIntegrationControllerTest {
 
     mockMvc
         .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.error")
+                .value("Google Health authorization has expired; reconnect the integration"));
+  }
+
+  @Test
+  void sync_returns409_withoutCallingGoogle_whenTheConnectionAlreadyNeedsReconnect()
+      throws Exception {
+    UUID userId = UUID.randomUUID();
+    GoogleHealthConnection connection =
+        GoogleHealthConnection.builder().status(ConnectionStatus.NEEDS_RECONNECT).build();
+    when(properties.isEnabled()).thenReturn(true);
+    when(connectionService.findConnection(userId)).thenReturn(Optional.of(connection));
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.error")
+                .value("Google Health authorization has expired; reconnect the integration"));
+
+    verifyNoInteractions(syncer);
   }
 
   @Test
