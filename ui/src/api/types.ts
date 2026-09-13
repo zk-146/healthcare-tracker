@@ -85,6 +85,19 @@ export interface MilestoneResponse {
 
 export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
 
+/** GET /api/v1/activities/{id}/insights — AI read of one workout's saved notes. */
+export interface NotesInsightResponse {
+  activityId: string;
+  /** False when there are no notes or the analysis could not run. */
+  available: boolean;
+  /** 'positive' | 'neutral' | 'negative' | 'unknown'; null when unavailable. */
+  mood: string | null;
+  painMentioned: boolean | null;
+  painDescription: string | null;
+  /** Human-readable status when available is false. */
+  message: string | null;
+}
+
 /** Response to a Fitbit dailyActivity_merged.csv import. */
 export interface CsvImportResponse {
   fileName: string;

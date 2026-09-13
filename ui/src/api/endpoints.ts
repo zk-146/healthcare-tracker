@@ -10,6 +10,7 @@ import type {
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
   MilestoneResponse,
+  NotesInsightResponse,
   Page,
   ProfileResponse,
   ProfileUpdateInput,
@@ -40,6 +41,12 @@ export function getSummaryFor(api: ApiClient, period: SummaryPeriod): Promise<Su
     return getWeeklySummary(api);
   }
   return getMonthlySummary(api);
+}
+
+/** Arbitrary inclusive range. The backend rejects from > to and spans over 365 days. */
+export function getSummaryRange(api: ApiClient, from: string, to: string): Promise<SummaryResponse> {
+  const params = new URLSearchParams({ from, to });
+  return api.get<SummaryResponse>(`/api/v1/summary?${params.toString()}`);
 }
 
 /**
@@ -257,6 +264,14 @@ export function updateActivity(
 
 export function deleteActivity(api: ApiClient, id: string): Promise<void> {
   return api.del<void>(`/api/v1/activities/${id}`);
+}
+
+/**
+ * AI read of the activity's *saved* notes. Like getDigest, never rejects on the LLM
+ * being unavailable — check `available`; `message` explains why when it is false.
+ */
+export function getNotesInsight(api: ApiClient, id: string): Promise<NotesInsightResponse> {
+  return api.get<NotesInsightResponse>(`/api/v1/activities/${id}/insights`);
 }
 
 /**

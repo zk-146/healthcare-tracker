@@ -12,8 +12,10 @@ import {
   getGoogleHealthConnectUrl,
   getMilestones,
   getMonthlySummary,
+  getNotesInsight,
   getProfile,
   getSummaryFor,
+  getSummaryRange,
   getWeeklySummary,
   importFitbitCsv,
   listAllActivities,
@@ -444,5 +446,23 @@ describe('getMilestones', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/milestones');
     expect(result).toEqual(milestones);
+  });
+});
+
+describe('insight and custom-range endpoints', () => {
+  it('fetches the notes insight for one activity', async () => {
+    const api = spyClient();
+
+    await getNotesInsight(api, 'a1');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/activities/a1/insights');
+  });
+
+  it('fetches a summary for an explicit date range', async () => {
+    const api = spyClient();
+
+    await getSummaryRange(api, '2026-08-15', '2026-09-13');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/summary?from=2026-08-15&to=2026-09-13');
   });
 });
