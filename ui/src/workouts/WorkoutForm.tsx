@@ -9,6 +9,7 @@ import {
   draftFrom,
   emptyDraft,
   hasDetails,
+  toLocalInput,
   validateDraft,
   type FieldErrors,
   type WorkoutDraft,
@@ -249,6 +250,8 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
             <input
               id="startedAt"
               type="datetime-local"
+              // The picker won't offer future times; validateDraft still rejects a typed one.
+              max={toLocalInput(now)}
               value={draft.startedAt}
               onChange={(event) => set('startedAt', event.target.value)}
               aria-invalid={errors.startedAt !== undefined}

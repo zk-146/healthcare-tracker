@@ -3,6 +3,7 @@ import type { ApiClient } from '../api/client';
 import { listAllActivities } from '../api/endpoints';
 import type { ActivityFilters, ActivityResponse, ActivitySource, ActivityType, Page } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
+import { toDayKey } from '../lib/days';
 import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
@@ -69,6 +70,8 @@ export function WorkoutsPage({
   const [moreError, setMoreError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ActivityResponse | null>(null);
   const [filters, setFilters] = useState<ActivityFilters>({});
+  // No workout can start in the future, so the pickers don't offer those days.
+  const [today] = useState(() => toDayKey(new Date()));
 
   // Bumped by every action that starts a fresh query (refetch/setFilter/clearFilters).
   // loadMore captures this before its request and only commits if it still matches when
@@ -181,6 +184,7 @@ export function WorkoutsPage({
           <input
             id="filterFrom"
             type="date"
+            max={today}
             value={filters.from ?? ''}
             onChange={(event) => setFilter('from', event.target.value)}
           />
@@ -193,6 +197,7 @@ export function WorkoutsPage({
           <input
             id="filterTo"
             type="date"
+            max={today}
             value={filters.to ?? ''}
             onChange={(event) => setFilter('to', event.target.value)}
           />

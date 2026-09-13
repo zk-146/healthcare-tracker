@@ -196,6 +196,28 @@ describe('SummaryDetailsCard', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it('rejects a future end date without making a request', async () => {
+    const get = vi.fn().mockResolvedValue(summaryFor());
+    render(<SummaryDetailsCard api={stubApi(get)} now={now} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Custom' }));
+    await waitFor(() => expect(get).toHaveBeenCalledWith(DEFAULT_RANGE_PATH));
+    get.mockClear();
+
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-09-14' } });
+
+    expect(await screen.findByText("End date can't be in the future.")).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('caps both custom date pickers at today', async () => {
+    const get = vi.fn().mockResolvedValue(summaryFor());
+    render(<SummaryDetailsCard api={stubApi(get)} now={now} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Custom' }));
+
+    expect(screen.getByLabelText('From')).toHaveAttribute('max', '2026-09-13');
+    expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-13');
+  });
+
   it('keeps the custom dates when switching away and back', async () => {
     const get = vi.fn().mockResolvedValue(summaryFor());
     render(<SummaryDetailsCard api={stubApi(get)} now={now} />);

@@ -52,6 +52,12 @@ const existingDevice: ActivityResponse = {
 };
 
 describe('WorkoutForm — create mode', () => {
+  it('caps the start-time picker at the current minute', () => {
+    render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    expect(screen.getByLabelText('Started at')).toHaveAttribute('max', '2026-09-08T10:00');
+  });
+
   it('renders the create title and hides the optional fields', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
 

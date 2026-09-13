@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+﻿import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../api/client';
 import type { ActivityResponse } from '../api/types';
+import { toDayKey } from '../lib/days';
 import { WorkoutsPage } from './WorkoutsPage';
 
 function activity(overrides: Partial<ActivityResponse> = {}): ActivityResponse {
@@ -54,6 +55,15 @@ function apiWithPages(pages: Record<number, ReturnType<typeof pageOf>>): ApiClie
 }
 
 describe('WorkoutsPage', () => {
+  it('caps both date filters at today', async () => {
+    const api = apiWithPages({ 0: pageOf([activity()]) });
+    render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
+    await screen.findByText(rowType('Cycling'));
+
+    expect(screen.getByLabelText('From')).toHaveAttribute('max', toDayKey(new Date()));
+    expect(screen.getByLabelText('To')).toHaveAttribute('max', toDayKey(new Date()));
+  });
+
   it('renders a row per activity once the first page resolves', async () => {
     const api = apiWithPages({ 0: pageOf([activity()]) });
     render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);

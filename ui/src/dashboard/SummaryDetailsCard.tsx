@@ -3,6 +3,7 @@ import { type ApiClient } from '../api/client';
 import { getDigest, getSummaryFor, getSummaryRange } from '../api/endpoints';
 import type { DigestResponse, SummaryPeriod } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
+import { toDayKey } from '../lib/days';
 import type { Loadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
@@ -30,6 +31,7 @@ interface SummaryDetailsCardProps {
 export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
   const [selection, setSelection] = useState<Selection>('weekly');
   // Kept across selection changes so flipping to Week and back doesn't lose the dates.
+  const [today] = useState(() => toDayKey(now ?? new Date()));
   const [range, setRange] = useState<DateRange>(() => defaultRange(now ?? new Date()));
   const [digest, setDigest] = useState<Loadable<DigestResponse> | null>(null);
 
@@ -70,7 +72,7 @@ export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
 
   function renderBody() {
     if (selection === 'custom') {
-      const rangeError = validateRange(range.from, range.to);
+      const rangeError = validateRange(range.from, range.to, today);
       if (rangeError !== null) {
         // No SummaryBody means no request: the range is fixed client-side first.
         return <ErrorNote message={rangeError} />;
@@ -129,6 +131,7 @@ export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
             <input
               id="summaryFrom"
               type="date"
+              max={today}
               value={range.from}
               onChange={(event) => setRangeField('from', event.target.value)}
             />
@@ -140,6 +143,7 @@ export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
             <input
               id="summaryTo"
               type="date"
+              max={today}
               value={range.to}
               onChange={(event) => setRangeField('to', event.target.value)}
             />

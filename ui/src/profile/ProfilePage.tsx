@@ -3,6 +3,7 @@ import { ApiError, type ApiClient } from '../api/client';
 import { deleteAccount, getDeepSeekStatus, getProfile, updateProfile } from '../api/endpoints';
 import type { DeepSeekStatusResponse, ProfileResponse } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
+import { toDayKey } from '../lib/days';
 import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
@@ -161,6 +162,8 @@ function ProfileForm({
             <input
               id="dateOfBirth"
               type="date"
+              // Must be strictly in the past (backend @Past), so today is excluded too.
+              max={toDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))}
               value={draft.dateOfBirth}
               onChange={(event) => set('dateOfBirth', event.target.value)}
               aria-invalid={errors.dateOfBirth !== undefined}

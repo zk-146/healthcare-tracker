@@ -33,8 +33,12 @@ export function defaultRange(today: Date): DateRange {
  * Returns the first problem with the range, or null when it is fine to request.
  * "Days between" matches the backend's ChronoUnit.DAYS.between, so a 365-day gap
  * (e.g. 2025-01-01 → 2026-01-01) is allowed and one more day is not.
+ *
+ * `today` is the caller's local day key. A summary can't cover days that haven't
+ * happened, so an end date after it is rejected (a start after it is then already
+ * caught as a reversed range).
  */
-export function validateRange(from: string, to: string): string | null {
+export function validateRange(from: string, to: string, today: string): string | null {
   if (from === '' || to === '') {
     return 'Pick both a start and end date.';
   }
@@ -42,6 +46,10 @@ export function validateRange(from: string, to: string): string | null {
   const days = Math.round((parseDayKey(to).getTime() - parseDayKey(from).getTime()) / MS_PER_DAY);
   if (days < 0) {
     return 'Start date must be on or before end date.';
+  }
+  // Zero-padded YYYY-MM-DD keys order correctly as plain strings.
+  if (to > today) {
+    return "End date can't be in the future.";
   }
   if (days > MAX_RANGE_DAYS) {
     return `Range can't be longer than ${MAX_RANGE_DAYS} days.`;
