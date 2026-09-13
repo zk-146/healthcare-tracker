@@ -114,6 +114,15 @@ export function AiSettingsCard({ api, status, onChanged }: AiSettingsCardProps) 
           : 'Add your own DeepSeek API key to generate AI digests and insights through DeepSeek instead of the shared local model.'}
       </p>
 
+      {/* The provider is chosen server-wide, so without this a key could be saved "successfully"
+          and then silently ignored. Hidden while status is loading rather than guessed. */}
+      {status !== null && !status.active && (
+        <p className="empty-note" role="status">
+          This server uses its local AI model, so a DeepSeek key won't be used. Set
+          AI_PROVIDER=deepseek on the server to switch.
+        </p>
+      )}
+
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         {banner !== null && <ErrorNote message={banner} />}
         {lastAction === 'saved' && banner === null && <p className="saved-note">Saved.</p>}
