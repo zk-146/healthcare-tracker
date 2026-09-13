@@ -1,10 +1,12 @@
 package com.healthcare.activitytracker.controller;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,7 +16,9 @@ import com.healthcare.activitytracker.model.entity.GoogleHealthConnection;
 import com.healthcare.activitytracker.model.enums.ConnectionStatus;
 import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.GoogleHealthConnectionService;
+import com.healthcare.activitytracker.service.GoogleHealthConnectionSyncer;
 import com.healthcare.activitytracker.service.GoogleHealthOAuthService;
+import com.healthcare.activitytracker.service.GoogleHealthOAuthService.RefreshTokenRevokedException;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
 import java.time.LocalDateTime;
@@ -40,6 +44,7 @@ class GoogleHealthIntegrationControllerTest {
   @Autowired MockMvc mockMvc;
   @MockBean GoogleHealthOAuthService oauthService;
   @MockBean GoogleHealthConnectionService connectionService;
+  @MockBean GoogleHealthConnectionSyncer syncer;
   @MockBean GoogleHealthProperties properties;
   @MockBean AuthService authService;
   @MockBean JwtUtil jwtUtil;
@@ -159,5 +164,91 @@ class GoogleHealthIntegrationControllerTest {
         .andExpect(status().isNoContent());
 
     verify(connectionService).disconnect(userId);
+  }
+
+  @Test
+  void sync_returns200_withTheImportCountAndNewWatermark() throws Exception {
+    UUID userId = UUID.randomUUID();
+    GoogleHealthConnection connection =
+        GoogleHealthConnection.builder()
+            .status(ConnectionStatus.CONNECTED)
+            .lastSyncedAt(LocalDateTime.of(2026, 9, 13, 8, 0))
+            .build();
+    when(properties.isEnabled()).thenReturn(true);
+    when(connectionService.findConnection(userId)).thenReturn(Optional.of(connection));
+    when(syncer.syncConnection(connection)).thenReturn(3);
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.imported").value(3))
+        .andExpect(jsonPath("$.lastSyncedAt").value("2026-09-13T08:00:00"));
+  }
+
+  @Test
+  void sync_returns503_whenTheIntegrationIsDisabled() throws Exception {
+    when(properties.isEnabled()).thenReturn(false);
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(UUID.randomUUID())))
+        .andExpect(status().isServiceUnavailable());
+  }
+
+  @Test
+  void sync_returns404_whenTheUserHasNoConnection() throws Exception {
+    UUID userId = UUID.randomUUID();
+    when(properties.isEnabled()).thenReturn(true);
+    when(connectionService.findConnection(userId)).thenReturn(Optional.empty());
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error").value("No Google Health connection for this user"));
+
+    verify(connectionService).findConnection(userId);
+  }
+
+  @Test
+  void sync_returns409_whenTheRefreshTokenHasBeenRevoked() throws Exception {
+    UUID userId = UUID.randomUUID();
+    GoogleHealthConnection connection =
+        GoogleHealthConnection.builder().status(ConnectionStatus.CONNECTED).build();
+    when(properties.isEnabled()).thenReturn(true);
+    when(connectionService.findConnection(userId)).thenReturn(Optional.of(connection));
+    when(syncer.syncConnection(connection))
+        .thenThrow(new RefreshTokenRevokedException("revoked", new RuntimeException()));
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.error")
+                .value("Google Health authorization has expired; reconnect the integration"));
+  }
+
+  @Test
+  void sync_returns409_withoutCallingGoogle_whenTheConnectionAlreadyNeedsReconnect()
+      throws Exception {
+    UUID userId = UUID.randomUUID();
+    GoogleHealthConnection connection =
+        GoogleHealthConnection.builder().status(ConnectionStatus.NEEDS_RECONNECT).build();
+    when(properties.isEnabled()).thenReturn(true);
+    when(connectionService.findConnection(userId)).thenReturn(Optional.of(connection));
+
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
+        .andExpect(status().isConflict())
+        .andExpect(
+            jsonPath("$.error")
+                .value("Google Health authorization has expired; reconnect the integration"));
+
+    verifyNoInteractions(syncer);
+  }
+
+  @Test
+  void sync_returns401_whenUnauthenticated() throws Exception {
+    mockMvc
+        .perform(post("/api/v1/integrations/google-health/sync"))
+        .andExpect(status().isUnauthorized());
   }
 }

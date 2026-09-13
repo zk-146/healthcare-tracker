@@ -103,10 +103,18 @@ public class GoogleHealthConnectionService {
    * Returns a usable access token for the connection, refreshing it first if it is at/near expiry.
    * The (possibly updated) tokens are persisted.
    *
+   * <p>{@code noRollbackFor}: on a revoked refresh token this method saves {@code NEEDS_RECONNECT}
+   * and then throws. Under the default rule — roll back on any {@code RuntimeException} — that
+   * exception would discard the status write, leaving the connection {@code CONNECTED} to be
+   * retried and re-notified on every poll. Any caller that wraps this in its own
+   * {@code @Transactional} must declare the same {@code noRollbackFor}, or catch the exception
+   * outside its outermost transaction — otherwise that boundary rolls the write back and surfaces
+   * {@code UnexpectedRollbackException} instead.
+   *
    * @throws RefreshTokenRevokedException if re-consent is required; the connection has already been
    *     marked {@link ConnectionStatus#NEEDS_RECONNECT} and the owner notified
    */
-  @Transactional
+  @Transactional(noRollbackFor = RefreshTokenRevokedException.class)
   public String getFreshAccessToken(GoogleHealthConnection connection) {
     if (!isExpiringSoon(connection)) {
       return tokenCipher.decrypt(connection.getAccessToken());

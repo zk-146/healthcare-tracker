@@ -335,6 +335,24 @@
       ]
     },
     {
+      "name": "Activity Types",
+      "item": [
+        {
+          "name": "List activity types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/activity-types"
+          }
+        }
+      ]
+    },
+    {
       "name": "Google Health Integration",
       "item": [
         {
@@ -368,6 +386,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/integrations/google-health/status"
+          }
+        },
+        {
+          "name": "Sync now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/integrations/google-health/sync"
           }
         },
         {
@@ -542,6 +573,28 @@
               ]
             },
             "description": "AI-generated activity digest. Requires Ollama reachable at app.ollama.base-url. When it is down or OLLAMA_ENABLED=false the response is 200 with available=false and a fallback message - never an error. Unknown period values return 400."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Milestones",
+      "item": [
+        {
+          "name": "Milestone progress",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/milestones/progress"
           }
         }
       ]
