@@ -1,82 +1,94 @@
 import { useEffect, useRef, useState } from 'react';
 import { type ApiClient } from '../api/client';
-import { getDigest, getSummaryFor } from '../api/endpoints';
+import { getDigest, getSummaryFor, getSummaryRange } from '../api/endpoints';
 import type { DigestResponse, SummaryPeriod } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
 import type { Loadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { defaultRange, validateRange, type DateRange } from './range';
 import { SummaryBody } from './SummaryBody';
 
-const PERIOD_LABELS: Record<SummaryPeriod, string> = {
+type Selection = SummaryPeriod | 'custom';
+
+const SELECTION_LABELS: Record<Selection, string> = {
   daily: 'Day',
   weekly: 'Week',
   monthly: 'Month',
+  custom: 'Custom',
 };
 
-const PERIODS: SummaryPeriod[] = ['daily', 'weekly', 'monthly'];
+const SELECTIONS: Selection[] = ['daily', 'weekly', 'monthly', 'custom'];
 
 interface SummaryDetailsCardProps {
   api: ApiClient;
+  /** Injectable for tests; the default custom range ends on this day. */
+  now?: Date;
 }
 
-export function SummaryDetailsCard({ api }: SummaryDetailsCardProps) {
-  const [period, setPeriod] = useState<SummaryPeriod>('weekly');
+export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
+  const [selection, setSelection] = useState<Selection>('weekly');
+  // Kept across selection changes so flipping to Week and back doesn't lose the dates.
+  const [range, setRange] = useState<DateRange>(() => defaultRange(now ?? new Date()));
   const [digest, setDigest] = useState<Loadable<DigestResponse> | null>(null);
 
-  // Tracks the *current* period so an in-flight loadDigest() can tell, at resolution
+  // Tracks the *current* selection so an in-flight loadDigest() can tell, at resolution
   // time, whether the user has since switched away from the period it was requested
-  // for. A plain closure variable can't do this: `period` inside loadDigest is fixed
-  // to the value at the render that created the closure, so it never changes even
-  // after the user switches periods mid-request.
-  const periodRef = useRef(period);
-  periodRef.current = period;
+  // for. A plain closure variable can't do this: the value inside loadDigest is fixed
+  // at the render that created the closure, so it never changes even after the user
+  // switches mid-request.
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
 
   // A digest fetched for one period is stale (and possibly costly to regenerate) once the
-  // period changes, so drop it rather than showing last period's recap under a new label.
+  // selection changes, so drop it rather than showing last period's recap under a new label.
   useEffect(() => {
     setDigest(null);
-  }, [period]);
+  }, [selection]);
 
-  async function loadDigest(): Promise<void> {
-    const requestedPeriod = period;
+  async function loadDigest(requestedPeriod: SummaryPeriod): Promise<void> {
     setDigest({ state: 'loading' });
     try {
       const value = await getDigest(api, requestedPeriod);
-      if (periodRef.current !== requestedPeriod) {
-        // The user switched periods before this resolved; the effect above already
-        // cleared `digest` for the new period, so applying this stale result would
-        // show one period's recap mislabeled as another's.
+      if (selectionRef.current !== requestedPeriod) {
+        // The user switched before this resolved; the effect above already cleared
+        // `digest`, so applying this stale result would mislabel one period's recap.
         return;
       }
       setDigest({ state: 'ready', value });
     } catch (cause: unknown) {
-      if (periodRef.current === requestedPeriod) {
+      if (selectionRef.current === requestedPeriod) {
         setDigest({ state: 'error', message: messageFor(cause) });
       }
     }
   }
 
-  return (
-    <Card title="Summary">
-      <div className="segmented" role="group" aria-label="Summary period">
-        {PERIODS.map((candidate) => (
-          <button
-            key={candidate}
-            type="button"
-            className="segmented-button"
-            aria-pressed={period === candidate}
-            onClick={() => setPeriod(candidate)}
-          >
-            {PERIOD_LABELS[candidate]}
-          </button>
-        ))}
-      </div>
+  function setRangeField(key: keyof DateRange, value: string): void {
+    setRange((current) => ({ ...current, [key]: value }));
+  }
 
+  function renderBody() {
+    if (selection === 'custom') {
+      const rangeError = validateRange(range.from, range.to);
+      if (rangeError !== null) {
+        // No SummaryBody means no request: the range is fixed client-side first.
+        return <ErrorNote message={rangeError} />;
+      }
+      // No AI recap here: /summary/digest only understands daily/weekly/monthly.
+      return (
+        <SummaryBody
+          load={() => getSummaryRange(api, range.from, range.to)}
+          loadKey={`custom:${range.from}:${range.to}`}
+        />
+      );
+    }
+
+    const period = selection;
+    return (
       <SummaryBody load={() => getSummaryFor(api, period)} loadKey={period}>
         {digest === null && (
-          <button type="button" className="link-button" onClick={() => void loadDigest()}>
+          <button type="button" className="link-button" onClick={() => void loadDigest(period)}>
             Generate AI recap
           </button>
         )}
@@ -89,6 +101,53 @@ export function SummaryDetailsCard({ api }: SummaryDetailsCardProps) {
           </p>
         )}
       </SummaryBody>
+    );
+  }
+
+  return (
+    <Card title="Summary">
+      <div className="segmented" role="group" aria-label="Summary period">
+        {SELECTIONS.map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            className="segmented-button"
+            aria-pressed={selection === candidate}
+            onClick={() => setSelection(candidate)}
+          >
+            {SELECTION_LABELS[candidate]}
+          </button>
+        ))}
+      </div>
+
+      {selection === 'custom' && (
+        <div className="filter-row">
+          <div className="field">
+            <label className="field-label" htmlFor="summaryFrom">
+              From
+            </label>
+            <input
+              id="summaryFrom"
+              type="date"
+              value={range.from}
+              onChange={(event) => setRangeField('from', event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="summaryTo">
+              To
+            </label>
+            <input
+              id="summaryTo"
+              type="date"
+              value={range.to}
+              onChange={(event) => setRangeField('to', event.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {renderBody()}
     </Card>
   );
 }
