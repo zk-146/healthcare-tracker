@@ -4,6 +4,7 @@ import com.healthcare.activitytracker.config.GoogleHealthProperties;
 import com.healthcare.activitytracker.model.entity.GoogleHealthConnection;
 import com.healthcare.activitytracker.model.integration.ImportedWorkout;
 import com.healthcare.activitytracker.repository.GoogleHealthConnectionRepository;
+import com.healthcare.activitytracker.service.GoogleHealthOAuthService.RefreshTokenRevokedException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -48,10 +49,16 @@ public class GoogleHealthConnectionSyncer {
    * Fetches workouts since the watermark, imports the new ones, then advances the watermark.
    * Imports are idempotent, so an overlapping window is safe.
    *
+   * <p>{@code noRollbackFor}: when the refresh token is revoked, {@code getFreshAccessToken} joins
+   * this transaction, marks the connection {@code NEEDS_RECONNECT} and throws. Rolling back here
+   * would discard that write too, so this boundary must not roll back for that exception either. It
+   * is safe: the token fetch is this method's first step, so no import or watermark update has
+   * happened when it throws.
+   *
    * @param connection the connection to sync
    * @return the number of newly imported activities
    */
-  @Transactional
+  @Transactional(noRollbackFor = RefreshTokenRevokedException.class)
   public int syncConnection(GoogleHealthConnection connection) {
     String accessToken = connectionService.getFreshAccessToken(connection);
 
