@@ -31,7 +31,9 @@ interface SummaryDetailsCardProps {
 export function SummaryDetailsCard({ api, now }: SummaryDetailsCardProps) {
   const [selection, setSelection] = useState<Selection>('weekly');
   // Kept across selection changes so flipping to Week and back doesn't lose the dates.
-  const [today] = useState(() => toDayKey(now ?? new Date()));
+  // Recomputed every render, not frozen at mount: a card left open past midnight must
+  // accept the new day.
+  const today = toDayKey(now ?? new Date());
   const [range, setRange] = useState<DateRange>(() => defaultRange(now ?? new Date()));
   const [digest, setDigest] = useState<Loadable<DigestResponse> | null>(null);
 

@@ -64,6 +64,25 @@ describe('WorkoutsPage', () => {
     expect(screen.getByLabelText('To')).toHaveAttribute('max', toDayKey(new Date()));
   });
 
+  it('moves the filter cap forward when the day changes while the page stays open', async () => {
+    // Only Date is faked, so Testing Library's own timers keep running.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 8, 13, 23, 59));
+      const api = apiWithPages({ 0: pageOf([activity()]) });
+      render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);
+      await screen.findByText(rowType('Cycling'));
+      expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-13');
+
+      vi.setSystemTime(new Date(2026, 8, 14, 0, 1));
+      await userEvent.selectOptions(screen.getByLabelText('Type'), 'CYCLING');
+
+      expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-14');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('renders a row per activity once the first page resolves', async () => {
     const api = apiWithPages({ 0: pageOf([activity()]) });
     render(<WorkoutsPage api={api} createOpen={false} onCreateClose={vi.fn()} importOpen={false} onImportClose={vi.fn()} />);

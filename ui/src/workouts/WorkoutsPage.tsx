@@ -70,8 +70,9 @@ export function WorkoutsPage({
   const [moreError, setMoreError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ActivityResponse | null>(null);
   const [filters, setFilters] = useState<ActivityFilters>({});
-  // No workout can start in the future, so the pickers don't offer those days.
-  const [today] = useState(() => toDayKey(new Date()));
+  // No workout can start in the future, so the pickers don't offer those days. Recomputed
+  // every render so a page left open past midnight still offers the new day.
+  const today = toDayKey(new Date());
 
   // Bumped by every action that starts a fresh query (refetch/setFilter/clearFilters).
   // loadMore captures this before its request and only commits if it still matches when

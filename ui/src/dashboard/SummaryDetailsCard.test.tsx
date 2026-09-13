@@ -218,6 +218,16 @@ describe('SummaryDetailsCard', () => {
     expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-13');
   });
 
+  it('moves the picker cap forward when the day changes while the card stays open', async () => {
+    const get = vi.fn().mockResolvedValue(summaryFor());
+    const { rerender } = render(<SummaryDetailsCard api={stubApi(get)} now={now} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Custom' }));
+
+    rerender(<SummaryDetailsCard api={stubApi(get)} now={new Date(2026, 8, 14, 0, 5)} />);
+
+    expect(screen.getByLabelText('To')).toHaveAttribute('max', '2026-09-14');
+  });
+
   it('keeps the custom dates when switching away and back', async () => {
     const get = vi.fn().mockResolvedValue(summaryFor());
     render(<SummaryDetailsCard api={stubApi(get)} now={now} />);

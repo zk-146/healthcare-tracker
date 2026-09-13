@@ -9,6 +9,7 @@ import {
   draftFrom,
   emptyDraft,
   hasDetails,
+  startedAtError,
   toLocalInput,
   validateDraft,
   type FieldErrors,
@@ -153,6 +154,21 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
+  /** Validates on pick rather than waiting for Save; see startedAtError for why. */
+  function setStartedAt(value: string): void {
+    set('startedAt', value);
+    const error = startedAtError(value, now);
+    setErrors((current) => {
+      const next = { ...current };
+      if (error === undefined) {
+        delete next.startedAt;
+      } else {
+        next.startedAt = error;
+      }
+      return next;
+    });
+  }
+
   function handleFailure(cause: unknown): void {
     if (cause instanceof ApiError && cause.status === 400 && cause.body?.details !== undefined) {
       const split = splitDetails(cause.body.details);
@@ -250,10 +266,10 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
             <input
               id="startedAt"
               type="datetime-local"
-              // The picker won't offer future times; validateDraft still rejects a typed one.
+              // Greys out later days only; setStartedAt catches a later time today.
               max={toLocalInput(now)}
               value={draft.startedAt}
-              onChange={(event) => set('startedAt', event.target.value)}
+              onChange={(event) => setStartedAt(event.target.value)}
               aria-invalid={errors.startedAt !== undefined}
               aria-describedby={errors.startedAt !== undefined ? 'startedAt-error' : undefined}
             />

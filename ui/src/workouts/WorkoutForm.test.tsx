@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type ApiClient } from '../api/client';
@@ -56,6 +56,25 @@ describe('WorkoutForm — create mode', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
 
     expect(screen.getByLabelText('Started at')).toHaveAttribute('max', '2026-09-08T10:00');
+  });
+
+  // `max` on datetime-local only greys out later *days*; browsers still let a later time
+  // today be picked. The error must therefore appear on pick, not wait for Save.
+  it('flags a future start time as soon as it is picked, and clears it once corrected', () => {
+    const api = fakeApi();
+    render(<WorkoutForm api={api} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+    const startedAt = screen.getByLabelText('Started at');
+
+    fireEvent.change(startedAt, { target: { value: '2026-09-08T23:30' } });
+
+    expect(screen.getByText('Start time cannot be in the future')).toBeInTheDocument();
+    expect(startedAt).toHaveAttribute('aria-invalid', 'true');
+    expect(api.post).not.toHaveBeenCalled();
+
+    fireEvent.change(startedAt, { target: { value: '2026-09-08T09:30' } });
+
+    expect(screen.queryByText('Start time cannot be in the future')).not.toBeInTheDocument();
+    expect(startedAt).toHaveAttribute('aria-invalid', 'false');
   });
 
   it('renders the create title and hides the optional fields', () => {

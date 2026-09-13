@@ -123,16 +123,29 @@ function parseNumeric(raw: string, rule: NumericRule): number | null {
   return value;
 }
 
+/**
+ * Shared by validateDraft (on Save) and WorkoutForm's change handler (on pick): `max` on a
+ * datetime-local input only greys out later days, so a later time today is still pickable.
+ */
+export function startedAtError(startedAt: string, now: Date): string | undefined {
+  if (startedAt.trim() === '') {
+    return 'Start time is required';
+  }
+  if (new Date(startedAt).getTime() > now.getTime()) {
+    return 'Start time cannot be in the future';
+  }
+  return undefined;
+}
+
 export function validateDraft(
   draft: WorkoutDraft,
   now: Date,
 ): { errors: FieldErrors; input: ActivityInput | null } {
   const errors: FieldErrors = {};
 
-  if (draft.startedAt.trim() === '') {
-    errors.startedAt = 'Start time is required';
-  } else if (new Date(draft.startedAt).getTime() > now.getTime()) {
-    errors.startedAt = 'Start time cannot be in the future';
+  const startError = startedAtError(draft.startedAt, now);
+  if (startError !== undefined) {
+    errors.startedAt = startError;
   }
 
   const duration = Number(draft.durationMinutes);

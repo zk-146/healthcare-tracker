@@ -4,6 +4,7 @@ import {
   draftFrom,
   emptyDraft,
   hasDetails,
+  startedAtError,
   toLocalInput,
   validateDraft,
   type WorkoutDraft,
@@ -18,6 +19,21 @@ function draft(overrides: Partial<WorkoutDraft> = {}): WorkoutDraft {
 describe('toLocalInput', () => {
   it('formats a Date as a zero-padded datetime-local value', () => {
     expect(toLocalInput(new Date(2026, 0, 3, 7, 5))).toBe('2026-01-03T07:05');
+  });
+});
+
+describe('startedAtError', () => {
+  it('requires a value', () => {
+    expect(startedAtError('', now)).toBe('Start time is required');
+  });
+
+  it('accepts the current minute and anything earlier', () => {
+    expect(startedAtError('2026-09-08T10:00', now)).toBeUndefined();
+    expect(startedAtError('2026-09-07T23:59', now)).toBeUndefined();
+  });
+
+  it('rejects a later time on the same day', () => {
+    expect(startedAtError('2026-09-08T10:01', now)).toBe('Start time cannot be in the future');
   });
 });
 
