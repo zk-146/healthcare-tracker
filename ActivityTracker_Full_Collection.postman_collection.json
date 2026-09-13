@@ -289,6 +289,20 @@
             ],
             "url": "{{baseUrl}}/api/v1/activities/{{activityId}}"
           }
+        },
+        {
+          "name": "AI notes insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/activities/{{activityId}}/insights",
+            "description": "AI analysis of this activity's notes (mood, pain mentions). Create an activity with a non-empty notes field first, and set {{activityId}}. Returns available=false when the activity has no notes or the LLM is unavailable; 404 if the activity is missing or owned by another user."
+          }
         }
       ]
     },
@@ -492,6 +506,42 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/summary/monthly"
+          }
+        },
+        {
+          "name": "AI digest (weekly)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "X-User-Timezone",
+                "value": "America/New_York"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/summary/digest?period=weekly",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "summary",
+                "digest"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "weekly",
+                  "description": "daily | weekly | monthly"
+                }
+              ]
+            },
+            "description": "AI-generated activity digest. Requires Ollama reachable at app.ollama.base-url. When it is down or OLLAMA_ENABLED=false the response is 200 with available=false and a fallback message - never an error. Unknown period values return 400."
           }
         }
       ]

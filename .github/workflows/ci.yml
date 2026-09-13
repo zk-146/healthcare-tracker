@@ -195,8 +195,12 @@ jobs:
 
   docker:
     needs: [build, frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required to publish the Trivy SARIF to the Security tab.
+      security-events: write
+
     steps:
       - uses: actions/checkout@v7
 
@@ -219,7 +223,10 @@ jobs:
           exit-code: '1'
           trivyignores: .trivyignore
 
+      # always(): when the gate above fails on a CRITICAL, that is exactly the run whose
+      # findings are most worth having in code scanning, so the report is still produced.
       - name: Trivy SARIF report
+        if: always()
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: activity-tracker:${{ github.sha }}
@@ -228,6 +235,16 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '0'
           trivyignores: .trivyignore
+
+      # As with CodeQL, results go to code scanning rather than only to an artifact:
+      # an artifact nobody opens leaves every HIGH finding behind a green check. The
+      # category keeps these findings separate from the CodeQL ones in the same repo.
+      - name: Upload Trivy SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
 
       - name: Upload Trivy SARIF as artifact
         if: always()
