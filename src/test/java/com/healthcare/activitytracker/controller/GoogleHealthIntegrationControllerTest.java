@@ -200,7 +200,10 @@ class GoogleHealthIntegrationControllerTest {
 
     mockMvc
         .perform(post("/api/v1/integrations/google-health/sync").with(uuidUser(userId)))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error").value("No Google Health connection for this user"));
+
+    verify(connectionService).findConnection(userId);
   }
 
   @Test
