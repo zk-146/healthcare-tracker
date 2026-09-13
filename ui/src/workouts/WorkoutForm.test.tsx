@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, type ApiClient } from '../api/client';
@@ -52,6 +52,31 @@ const existingDevice: ActivityResponse = {
 };
 
 describe('WorkoutForm — create mode', () => {
+  it('caps the start-time picker at the current minute', () => {
+    render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    expect(screen.getByLabelText('Started at')).toHaveAttribute('max', '2026-09-08T10:00');
+  });
+
+  // `max` on datetime-local only greys out later *days*; browsers still let a later time
+  // today be picked. The error must therefore appear on pick, not wait for Save.
+  it('flags a future start time as soon as it is picked, and clears it once corrected', () => {
+    const api = fakeApi();
+    render(<WorkoutForm api={api} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+    const startedAt = screen.getByLabelText('Started at');
+
+    fireEvent.change(startedAt, { target: { value: '2026-09-08T23:30' } });
+
+    expect(screen.getByText('Start time cannot be in the future')).toBeInTheDocument();
+    expect(startedAt).toHaveAttribute('aria-invalid', 'true');
+    expect(api.post).not.toHaveBeenCalled();
+
+    fireEvent.change(startedAt, { target: { value: '2026-09-08T09:30' } });
+
+    expect(screen.queryByText('Start time cannot be in the future')).not.toBeInTheDocument();
+    expect(startedAt).toHaveAttribute('aria-invalid', 'false');
+  });
+
   it('renders the create title and hides the optional fields', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
 
@@ -187,6 +212,16 @@ describe('WorkoutForm — create mode', () => {
     await user.tab();
     expect(document.activeElement).toBe(first);
   });
+
+  it('does not offer notes analysis for a workout that is not saved yet', async () => {
+    const user = userEvent.setup();
+    render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
+
+    await user.click(screen.getByRole('button', { name: 'More details' }));
+    await user.type(screen.getByLabelText('Notes'), 'felt great');
+
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+  });
 });
 
 describe('WorkoutForm — edit mode', () => {
@@ -312,5 +347,56 @@ describe('WorkoutForm — edit mode', () => {
     render(<WorkoutForm api={fakeApi()} onClose={vi.fn()} onSaved={vi.fn()} now={now} />);
 
     expect(screen.queryByRole('button', { name: 'Delete this workout' })).not.toBeInTheDocument();
+  });
+
+  it('offers notes analysis for a saved workout that has notes', () => {
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: 'Knee felt sore on the climb' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Analyze notes' })).toBeInTheDocument();
+    expect(screen.queryByText('Analysis uses your saved notes.')).not.toBeInTheDocument();
+  });
+
+  it('does not offer notes analysis when the saved notes are empty or blank', () => {
+    const { unmount } = render(
+      <WorkoutForm api={fakeApi()} initial={existing} onClose={vi.fn()} onSaved={vi.fn()} now={now} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: '   ' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Analyze notes' })).not.toBeInTheDocument();
+  });
+
+  it('warns that analysis uses the saved notes once the notes are edited', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkoutForm
+        api={fakeApi()}
+        initial={{ ...existing, notes: 'Knee felt sore on the climb' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        now={now}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Notes'), ' again');
+
+    expect(screen.getByText('Analysis uses your saved notes.')).toBeInTheDocument();
   });
 });

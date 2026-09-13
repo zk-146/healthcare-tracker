@@ -123,16 +123,51 @@ function parseNumeric(raw: string, rule: NumericRule): number | null {
   return value;
 }
 
+/**
+ * Shared by validateDraft (on Save) and WorkoutForm's change handler (on pick): `max` on a
+ * datetime-local input only greys out later days, so a later time today is still pickable.
+ */
+export function startedAtError(startedAt: string, now: Date): string | undefined {
+  if (startedAt.trim() === '') {
+    return 'Start time is required';
+  }
+  if (new Date(startedAt).getTime() > now.getTime()) {
+    return 'Start time cannot be in the future';
+  }
+  return undefined;
+}
+
+/**
+ * The history filters' date pair, both optional. Without this, a future or reversed
+ * pair just shows "No workouts match", which reads as missing data rather than a typo.
+ * Day keys are zero-padded YYYY-MM-DD, so they order correctly as strings.
+ */
+export function filterDatesError(
+  from: string | undefined,
+  to: string | undefined,
+  today: string,
+): string | null {
+  if (from !== undefined && from > today) {
+    return "From date can't be in the future.";
+  }
+  if (to !== undefined && to > today) {
+    return "To date can't be in the future.";
+  }
+  if (from !== undefined && to !== undefined && from > to) {
+    return 'From date must be on or before To date.';
+  }
+  return null;
+}
+
 export function validateDraft(
   draft: WorkoutDraft,
   now: Date,
 ): { errors: FieldErrors; input: ActivityInput | null } {
   const errors: FieldErrors = {};
 
-  if (draft.startedAt.trim() === '') {
-    errors.startedAt = 'Start time is required';
-  } else if (new Date(draft.startedAt).getTime() > now.getTime()) {
-    errors.startedAt = 'Start time cannot be in the future';
+  const startError = startedAtError(draft.startedAt, now);
+  if (startError !== undefined) {
+    errors.startedAt = startError;
   }
 
   const duration = Number(draft.durationMinutes);

@@ -4,10 +4,13 @@ import { createActivity, deleteActivity, updateActivity } from '../api/endpoints
 import type { ActivityResponse, ActivityType } from '../api/types';
 import { messageFor } from '../lib/apiMessage';
 import { ErrorNote } from '../ui/ErrorNote';
+import { NotesInsight } from './NotesInsight';
 import {
   draftFrom,
   emptyDraft,
   hasDetails,
+  startedAtError,
+  toLocalInput,
   validateDraft,
   type FieldErrors,
   type WorkoutDraft,
@@ -151,6 +154,21 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
+  /** Validates on pick rather than waiting for Save; see startedAtError for why. */
+  function setStartedAt(value: string): void {
+    set('startedAt', value);
+    const error = startedAtError(value, now);
+    setErrors((current) => {
+      const next = { ...current };
+      if (error === undefined) {
+        delete next.startedAt;
+      } else {
+        next.startedAt = error;
+      }
+      return next;
+    });
+  }
+
   function handleFailure(cause: unknown): void {
     if (cause instanceof ApiError && cause.status === 400 && cause.body?.details !== undefined) {
       const split = splitDetails(cause.body.details);
@@ -206,6 +224,13 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
     }
   }
 
+  // The backend analyses the persisted notes, so only a saved workout with notes on
+  // record can be analysed. Blank-only notes are saved as empty, hence the trim.
+  const savedNotes =
+    initial !== undefined && initial.notes !== null && initial.notes.trim() !== ''
+      ? initial.notes
+      : null;
+
   const title = initial === undefined ? 'Log workout' : 'Edit workout';
 
   return (
@@ -241,8 +266,10 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
             <input
               id="startedAt"
               type="datetime-local"
+              // Greys out later days only; setStartedAt catches a later time today.
+              max={toLocalInput(now)}
               value={draft.startedAt}
-              onChange={(event) => set('startedAt', event.target.value)}
+              onChange={(event) => setStartedAt(event.target.value)}
               aria-invalid={errors.startedAt !== undefined}
               aria-describedby={errors.startedAt !== undefined ? 'startedAt-error' : undefined}
             />
@@ -326,6 +353,15 @@ export function WorkoutForm({ api, initial, onClose, onSaved, now = new Date() }
                   {draft.notes.length} / {NOTES_LIMIT}
                 </span>
               </Field>
+
+              {initial !== undefined && savedNotes !== null && (
+                <div className="field">
+                  <NotesInsight api={api} activityId={initial.id} />
+                  {draft.notes !== savedNotes && (
+                    <span className="field-hint">Analysis uses your saved notes.</span>
+                  )}
+                </div>
+              )}
             </>
           )}
 

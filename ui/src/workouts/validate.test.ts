@@ -3,7 +3,9 @@ import type { ActivityResponse } from '../api/types';
 import {
   draftFrom,
   emptyDraft,
+  filterDatesError,
   hasDetails,
+  startedAtError,
   toLocalInput,
   validateDraft,
   type WorkoutDraft,
@@ -18,6 +20,46 @@ function draft(overrides: Partial<WorkoutDraft> = {}): WorkoutDraft {
 describe('toLocalInput', () => {
   it('formats a Date as a zero-padded datetime-local value', () => {
     expect(toLocalInput(new Date(2026, 0, 3, 7, 5))).toBe('2026-01-03T07:05');
+  });
+});
+
+describe('startedAtError', () => {
+  it('requires a value', () => {
+    expect(startedAtError('', now)).toBe('Start time is required');
+  });
+
+  it('accepts the current minute and anything earlier', () => {
+    expect(startedAtError('2026-09-08T10:00', now)).toBeUndefined();
+    expect(startedAtError('2026-09-07T23:59', now)).toBeUndefined();
+  });
+
+  it('rejects a later time on the same day', () => {
+    expect(startedAtError('2026-09-08T10:01', now)).toBe('Start time cannot be in the future');
+  });
+});
+
+describe('filterDatesError', () => {
+  const today = '2026-09-13';
+
+  it('accepts no dates, one date, or an ordered pair up to today', () => {
+    expect(filterDatesError(undefined, undefined, today)).toBeNull();
+    expect(filterDatesError('2026-09-01', undefined, today)).toBeNull();
+    expect(filterDatesError(undefined, today, today)).toBeNull();
+    expect(filterDatesError('2026-09-01', today, today)).toBeNull();
+  });
+
+  it('rejects a From date in the future', () => {
+    expect(filterDatesError('2026-09-14', undefined, today)).toBe("From date can't be in the future.");
+  });
+
+  it('rejects a To date in the future', () => {
+    expect(filterDatesError('2026-09-01', '2026-09-14', today)).toBe("To date can't be in the future.");
+  });
+
+  it('rejects a From date after the To date', () => {
+    expect(filterDatesError('2026-09-05', '2026-09-01', today)).toBe(
+      'From date must be on or before To date.',
+    );
   });
 });
 

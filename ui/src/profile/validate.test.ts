@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProfileResponse } from '../api/types';
-import { draftFrom, validateDraft, type ProfileDraft } from './validate';
+import { dateOfBirthError, draftFrom, validateDraft, type ProfileDraft } from './validate';
 
 const now = new Date(2026, 8, 8, 10, 0); // 2026-09-08T10:00 local
 
@@ -19,6 +19,22 @@ const profile: ProfileResponse = {
 function draft(overrides: Partial<ProfileDraft> = {}): ProfileDraft {
   return { ...draftFrom(profile), ...overrides };
 }
+
+describe('dateOfBirthError', () => {
+  it('accepts yesterday and anything earlier', () => {
+    expect(dateOfBirthError('2026-09-07', now)).toBeUndefined();
+    expect(dateOfBirthError('1990-01-01', now)).toBeUndefined();
+  });
+
+  it('rejects today and later', () => {
+    expect(dateOfBirthError('2026-09-08', now)).toBe('Date of birth must be in the past');
+    expect(dateOfBirthError('2030-01-01', now)).toBe('Date of birth must be in the past');
+  });
+
+  it('says nothing about an empty value (that rule depends on the saved profile)', () => {
+    expect(dateOfBirthError('', now)).toBeUndefined();
+  });
+});
 
 describe('draftFrom', () => {
   it('carries the profile fields into string form, blanking absent ones', () => {
