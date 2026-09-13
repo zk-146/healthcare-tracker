@@ -13,6 +13,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-for-local-testing-must-be-at-least-32-chars}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-for-local-testing-at-least-32-chars}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # "ollama" (server-wide local model) or "deepseek" (each user's own key from
+      # Profile > AI settings). Set AI_PROVIDER=deepseek in .env to use DeepSeek.
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
     depends_on:

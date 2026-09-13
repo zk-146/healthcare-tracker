@@ -74,6 +74,8 @@ export interface GoogleHealthConnectResponse {
 /** Whether the current user has configured their own DeepSeek API key. */
 export interface DeepSeekStatusResponse {
   connected: boolean;
+  /** True only when the server's AI provider is DeepSeek; otherwise a saved key is never used. */
+  active: boolean;
 }
 
 /** A streak milestone the user has already earned. */
