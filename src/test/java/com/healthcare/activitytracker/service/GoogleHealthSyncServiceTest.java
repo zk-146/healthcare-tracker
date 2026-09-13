@@ -1,25 +1,22 @@
 package com.healthcare.activitytracker.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.healthcare.activitytracker.config.GoogleHealthProperties;
 import com.healthcare.activitytracker.model.entity.GoogleHealthConnection;
 import com.healthcare.activitytracker.model.entity.User;
-import com.healthcare.activitytracker.model.integration.ImportedWorkout;
+import com.healthcare.activitytracker.model.enums.ConnectionStatus;
 import com.healthcare.activitytracker.repository.GoogleHealthConnectionRepository;
-import java.time.LocalDateTime;
+import com.healthcare.activitytracker.service.GoogleHealthOAuthService.RefreshTokenRevokedException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,77 +24,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class GoogleHealthSyncServiceTest {
 
   @Mock private GoogleHealthConnectionRepository connectionRepository;
-  @Mock private GoogleHealthConnectionService connectionService;
-  @Mock private GoogleHealthClient client;
-  @Mock private ActivityService activityService;
+  @Mock private GoogleHealthConnectionSyncer syncer;
 
   private final GoogleHealthProperties properties = new GoogleHealthProperties();
   private GoogleHealthSyncService syncService;
-
-  private final UUID userId = UUID.randomUUID();
-  private GoogleHealthConnection connection;
 
   @BeforeEach
   void setUp() {
     properties.setDeviceLabel("fitbit-charge-6");
     properties.setInitialBackfillDays(30);
-    syncService =
-        new GoogleHealthSyncService(
-            connectionRepository, connectionService, client, activityService, properties);
-
-    User user = User.builder().id(userId).email("o@example.com").build();
-    connection = GoogleHealthConnection.builder().id(UUID.randomUUID()).user(user).build();
+    syncService = new GoogleHealthSyncService(connectionRepository, syncer, properties);
   }
 
-  @Test
-  void importsNewWorkoutsAndAdvancesWatermark() {
-    when(connectionService.getFreshAccessToken(connection)).thenReturn("access-token");
-    LocalDateTime start = LocalDateTime.now().minusHours(2);
-    ImportedWorkout workout =
-        ImportedWorkout.builder().externalId("rec-1").rawType("RUN").startedAt(start).build();
-    when(client.fetchWorkoutsSince(eq("access-token"), any())).thenReturn(List.of(workout));
-    when(activityService.importWorkout(eq(userId), eq(workout), anyString())).thenReturn(true);
-
-    int imported = syncService.syncConnection(connection);
-
-    assertThat(imported).isEqualTo(1);
-    verify(activityService).importWorkout(userId, workout, "fitbit-charge-6");
-
-    ArgumentCaptor<GoogleHealthConnection> captor =
-        ArgumentCaptor.forClass(GoogleHealthConnection.class);
-    verify(connectionRepository).save(captor.capture());
-    assertThat(captor.getValue().getLastSyncedAt()).isEqualTo(start);
-  }
-
-  @Test
-  void duplicateWorkoutsAreNotCounted() {
-    when(connectionService.getFreshAccessToken(connection)).thenReturn("access-token");
-    ImportedWorkout workout =
-        ImportedWorkout.builder()
-            .externalId("rec-dup")
-            .rawType("WALK")
-            .startedAt(LocalDateTime.now().minusHours(1))
-            .build();
-    when(client.fetchWorkoutsSince(anyString(), any())).thenReturn(List.of(workout));
-    when(activityService.importWorkout(eq(userId), eq(workout), anyString())).thenReturn(false);
-
-    int imported = syncService.syncConnection(connection);
-
-    assertThat(imported).isZero();
-  }
-
-  @Test
-  void usesBackfillWindowWhenNeverSynced() {
-    when(connectionService.getFreshAccessToken(connection)).thenReturn("access-token");
-    when(client.fetchWorkoutsSince(anyString(), any())).thenReturn(List.of());
-
-    syncService.syncConnection(connection);
-
-    ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
-    verify(client).fetchWorkoutsSince(eq("access-token"), since.capture());
-    // ~30 days back, allow a small execution window
-    assertThat(since.getValue()).isBefore(LocalDateTime.now().minusDays(29));
-    assertThat(since.getValue()).isAfter(LocalDateTime.now().minusDays(31));
+  private GoogleHealthConnection newConnection() {
+    User user = User.builder().id(UUID.randomUUID()).email("o@example.com").build();
+    return GoogleHealthConnection.builder().id(UUID.randomUUID()).user(user).build();
   }
 
   @Test
@@ -107,5 +48,49 @@ class GoogleHealthSyncServiceTest {
     syncService.scheduledSync();
 
     verify(connectionRepository, never()).findByStatus(any());
+    verifyNoInteractions(syncer);
+  }
+
+  @Test
+  void scheduledSync_delegatesToTheSyncerBeanForEachConnectedConnection() {
+    properties.setEnabled(true);
+    GoogleHealthConnection first = newConnection();
+    GoogleHealthConnection second = newConnection();
+    when(connectionRepository.findByStatus(ConnectionStatus.CONNECTED))
+        .thenReturn(List.of(first, second));
+
+    syncService.scheduledSync();
+
+    verify(syncer).syncConnection(first);
+    verify(syncer).syncConnection(second);
+  }
+
+  @Test
+  void scheduledSync_continuesToTheNextConnectionWhenOneThrows() {
+    properties.setEnabled(true);
+    GoogleHealthConnection failing = newConnection();
+    GoogleHealthConnection healthy = newConnection();
+    when(connectionRepository.findByStatus(ConnectionStatus.CONNECTED))
+        .thenReturn(List.of(failing, healthy));
+    when(syncer.syncConnection(failing)).thenThrow(new IllegalStateException("boom"));
+
+    syncService.scheduledSync();
+
+    verify(syncer).syncConnection(healthy);
+  }
+
+  @Test
+  void scheduledSync_swallowsARevokedRefreshTokenAndContinues() {
+    properties.setEnabled(true);
+    GoogleHealthConnection revoked = newConnection();
+    GoogleHealthConnection healthy = newConnection();
+    when(connectionRepository.findByStatus(ConnectionStatus.CONNECTED))
+        .thenReturn(List.of(revoked, healthy));
+    when(syncer.syncConnection(revoked))
+        .thenThrow(new RefreshTokenRevokedException("revoked", new RuntimeException()));
+
+    syncService.scheduledSync();
+
+    verify(syncer).syncConnection(healthy);
   }
 }
