@@ -54,7 +54,7 @@
              what actually moves it; the property just keeps the number in one place.
              5.32.14 bundles DOMPurify 3.4.13, clearing the DOMPurify CVEs that the webjar
              drags in. Drop both once springdoc ships a swagger-ui at least this new. -->
-        <swagger-ui.version>5.32.14</swagger-ui.version>
+        <swagger-ui.version>5.33.1</swagger-ui.version>
     </properties>
 
     <dependencyManagement>
