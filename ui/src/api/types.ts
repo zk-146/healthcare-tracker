@@ -85,6 +85,55 @@ export interface MilestoneResponse {
   achievedAt: string;
 }
 
+export type GoalMetric = 'MINUTES' | 'SESSIONS' | 'DISTANCE_KM' | 'STEPS' | 'CALORIES';
+
+export type GoalPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+/**
+ * Where the user stands against one goal for the period currently in progress.
+ *
+ * The pace fields are the useful part: `percentComplete` alone cannot tell 40% on a
+ * Tuesday (ahead) from 40% on a Sunday (not).
+ */
+export interface GoalProgress {
+  /** LocalDate, "YYYY-MM-DD". Inclusive start of the period in progress. */
+  from: string;
+  /** Today in the caller's timezone — not the period's end. */
+  to: string;
+  currentValue: number;
+  /** Uncapped: beating a goal by half reads as 150, not 100. */
+  percentComplete: number;
+  achieved: boolean;
+  /** Days of the period gone by, inclusive of today. Always >= 1. */
+  daysElapsed: number;
+  /** Whole period length in days (1, 7, or the current month's length). */
+  daysTotal: number;
+  /** Days left after today. Zero on the period's final day. */
+  daysRemaining: number;
+  /** Where an even pace would have the user by now. */
+  expectedByNow: number;
+  onTrack: boolean;
+}
+
+export interface GoalResponse {
+  id: string;
+  metric: GoalMetric;
+  period: GoalPeriod;
+  targetValue: number;
+  /** Display suffix supplied by the backend, e.g. "km". */
+  unit: string;
+  createdAt: string;
+  updatedAt: string;
+  progress: GoalProgress;
+}
+
+/** Metric and period are fixed at creation — they key the backend's uniqueness rule. */
+export interface GoalInput {
+  metric: GoalMetric;
+  period: GoalPeriod;
+  targetValue: number;
+}
+
 export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
 
 /** GET /api/v1/activities/{id}/insights — AI read of one workout's saved notes. */

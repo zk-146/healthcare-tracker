@@ -4,6 +4,7 @@ import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.repository.ActivityGoalRepository;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.DeepSeekConnectionRepository;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
@@ -25,18 +26,21 @@ public class ProfileService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final StreakMilestoneRepository streakMilestoneRepository;
   private final DeepSeekConnectionRepository deepSeekConnectionRepository;
+  private final ActivityGoalRepository activityGoalRepository;
 
   public ProfileService(
       UserRepository userRepository,
       ActivityRepository activityRepository,
       RefreshTokenRepository refreshTokenRepository,
       StreakMilestoneRepository streakMilestoneRepository,
-      DeepSeekConnectionRepository deepSeekConnectionRepository) {
+      DeepSeekConnectionRepository deepSeekConnectionRepository,
+      ActivityGoalRepository activityGoalRepository) {
     this.userRepository = userRepository;
     this.activityRepository = activityRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.streakMilestoneRepository = streakMilestoneRepository;
     this.deepSeekConnectionRepository = deepSeekConnectionRepository;
+    this.activityGoalRepository = activityGoalRepository;
   }
 
   /**
@@ -106,14 +110,20 @@ public class ProfileService {
     // DeepSeekConnection is new as of this change, so its own FK would otherwise turn every
     // account deletion for a user with a saved key into a constraint-violation 500.
     deepSeekConnectionRepository.deleteAllByUserId(userId);
+    // Goals carry their own FK to users, so omitting this would turn deletion into a
+    // constraint-violation 500 for anyone who ever set one. Hard delete, archived rows
+    // included — the soft archive deleteGoal performs is about freeing a metric/period
+    // slot, and has nothing to say about the user row going away.
+    int goals = activityGoalRepository.deleteAllByUserId(userId);
     userRepository.delete(user);
 
     log.info(
-        "Account deleted for user {}: {} activities, {} refresh tokens, {} milestones removed",
+        "Account deleted for user {}: {} activities, {} refresh tokens, {} milestones, {} goals removed",
         userId,
         activities,
         tokens,
-        milestones);
+        milestones,
+        goals);
   }
 
   private ProfileResponse toResponse(User user) {

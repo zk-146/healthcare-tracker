@@ -403,6 +403,80 @@ body {
   text-align: center;
 }
 
+.goal-list,
+.goal-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal-row-head,
+.goal-manage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.goal-row-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.goal-row-value {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The shared .progress rule carries StreakHero's centring margins; a goal row is full-width. */
+.goal-row .progress {
+  margin: 8px 0 6px;
+}
+
+.goal-row-note {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/*
+ * Behind pace is deliberately NOT coloured as an error. Being short of an even run on a Tuesday
+ * is information, not a failure, and a red bar would reintroduce exactly the all-or-nothing
+ * feeling these goals exist to soften. Off-pace rows get a more legible note instead; the only
+ * colour accent is earned by meeting the goal.
+ */
+.goal-row[data-on-track='false'] .goal-row-note {
+  color: var(--text);
+}
+
+.goal-manage-row {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.goal-manage-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/*
+ * The add form follows the list directly, and the last row deliberately drops its
+ * bottom border — so without this the form reads as part of that last goal rather
+ * than as a separate action. Scoped to the sibling pair so the form still sits flush
+ * when there are no goals yet and no list is rendered.
+ */
+.goal-manage-list + form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .workout-list {
   list-style: none;
   margin: 0;

@@ -180,4 +180,30 @@
         <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-59270</cve>
     </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            DPoP proof replay in DPoPProofJwtDecoderFactory: the JWT-ID cache enforcing
+            replay protection is size-bounded, so flooding it evicts legitimate entries and
+            an intercepted proof can be replayed. Affects Spring Security 6.5.0-6.5.11.
+
+            That class ships in spring-security-oauth2-resource-server, which is not on this
+            application's dependency tree at all -- `mvn dependency:tree` under
+            org.springframework.security resolves only spring-security-config,
+            spring-security-web and spring-security-core (via
+            spring-boot-starter-security), plus spring-security-test. The vulnerable class
+            is therefore absent from the classpath, not merely unused.
+
+            Corroborating checks: no oauth2ResourceServer/oauth2Login/OAuth2AuthorizationServer
+            configuration and no JwtDecoder bean anywhere in src/main; no nimbus-jose-jwt on
+            the tree; no "dpop" reference anywhere in src. Bearer-token authentication here is
+            this application's own JwtAuthenticationFilter over jjwt, which does not touch
+            Spring Security's OAuth2 JWT decoding at all.
+
+            It is reported against spring-security-core because the vendor CPE attaches to
+            every jar in the release train -- see the Scope note at the top of this file.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
+        <cve>CVE-2026-41707</cve>
+    </suppress>
 </suppressions>

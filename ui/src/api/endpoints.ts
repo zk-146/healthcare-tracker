@@ -7,6 +7,8 @@ import type {
   CsvImportResponse,
   DeepSeekStatusResponse,
   DigestResponse,
+  GoalInput,
+  GoalResponse,
   GoogleHealthConnectResponse,
   GoogleHealthStatusResponse,
   MilestoneResponse,
@@ -311,6 +313,36 @@ export function importFitbitCsv(api: ApiClient, file: File): Promise<CsvImportRe
 /** Every streak milestone the caller has earned, longest streak first. */
 export function getMilestones(api: ApiClient): Promise<MilestoneResponse[]> {
   return api.get<MilestoneResponse[]>('/api/v1/milestones');
+}
+
+/**
+ * The caller's live goals, each with progress for the period in progress. Oldest first,
+ * so the dashboard ordering is stable across reloads.
+ */
+export function listGoals(api: ApiClient): Promise<GoalResponse[]> {
+  return api.get<GoalResponse[]>('/api/v1/goals');
+}
+
+/** Rejects with 409 when a live goal already covers this metric and period. */
+export function createGoal(api: ApiClient, input: GoalInput): Promise<GoalResponse> {
+  return api.post<GoalResponse>('/api/v1/goals', input);
+}
+
+/**
+ * Only the target is editable. Changing metric or period means retiring this goal and
+ * creating another, because that pair is what the backend's uniqueness rule is keyed on.
+ */
+export function updateGoalTarget(
+  api: ApiClient,
+  id: string,
+  targetValue: number,
+): Promise<GoalResponse> {
+  return api.put<GoalResponse>(`/api/v1/goals/${id}`, { targetValue });
+}
+
+/** Retires the goal, freeing its metric/period slot. Archived server-side, not erased. */
+export function deleteGoal(api: ApiClient, id: string): Promise<void> {
+  return api.del<void>(`/api/v1/goals/${id}`);
 }
 
 export function getProfile(api: ApiClient): Promise<ProfileResponse> {

@@ -11,6 +11,7 @@ import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.repository.ActivityGoalRepository;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.DeepSeekConnectionRepository;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
@@ -34,6 +35,7 @@ class ProfileServiceTest {
   @Mock private RefreshTokenRepository refreshTokenRepository;
   @Mock private StreakMilestoneRepository streakMilestoneRepository;
   @Mock private DeepSeekConnectionRepository deepSeekConnectionRepository;
+  @Mock private ActivityGoalRepository activityGoalRepository;
 
   private ProfileService profileService;
   private final UUID userId = UUID.randomUUID();
@@ -46,7 +48,8 @@ class ProfileServiceTest {
             activityRepository,
             refreshTokenRepository,
             streakMilestoneRepository,
-            deepSeekConnectionRepository);
+            deepSeekConnectionRepository,
+            activityGoalRepository);
   }
 
   private User buildUser() {
@@ -132,6 +135,7 @@ class ProfileServiceTest {
     verify(streakMilestoneRepository).deleteAllByUserId(userId);
     verify(activityRepository).deleteAllByUserId(userId);
     verify(deepSeekConnectionRepository).deleteAllByUserId(userId);
+    verify(activityGoalRepository).deleteAllByUserId(userId);
     verify(userRepository).delete(user);
   }
 
@@ -146,6 +150,7 @@ class ProfileServiceTest {
     verify(streakMilestoneRepository, never()).deleteAllByUserId(any());
     verify(activityRepository, never()).deleteAllByUserId(any());
     verify(deepSeekConnectionRepository, never()).deleteAllByUserId(any());
+    verify(activityGoalRepository, never()).deleteAllByUserId(any());
     verify(userRepository, never()).delete(any());
   }
 }

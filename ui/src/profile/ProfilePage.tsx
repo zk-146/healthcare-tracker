@@ -8,6 +8,7 @@ import { useLoadable } from '../lib/useLoadable';
 import { Card } from '../ui/Card';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { GoalsCard } from '../goals/GoalsCard';
 import { AiSettingsCard } from './AiSettingsCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
 import {
@@ -232,6 +233,8 @@ function ProfileForm({
           </button>
         </form>
       </Card>
+
+      <GoalsCard api={api} />
 
       <AiSettingsCard api={api} status={deepseekStatus} onChanged={onDeepseekChanged} />
 
