@@ -465,6 +465,18 @@ body {
   padding-bottom: 0;
 }
 
+/*
+ * The add form follows the list directly, and the last row deliberately drops its
+ * bottom border — so without this the form reads as part of that last goal rather
+ * than as a separate action. Scoped to the sibling pair so the form still sits flush
+ * when there are no goals yet and no list is rendered.
+ */
+.goal-manage-list + form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .workout-list {
   list-style: none;
   margin: 0;
