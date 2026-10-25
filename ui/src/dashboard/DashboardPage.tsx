@@ -6,6 +6,7 @@ import { bucketByDay, dayKeyOf, rollingWindow, type DayBucket } from '../lib/day
 import { useLoadable } from '../lib/useLoadable';
 import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
+import { GoalsProgressCard } from '../goals/GoalsProgressCard';
 import { FreshnessCard } from './FreshnessCard';
 import { LatestDayCard } from './LatestDayCard';
 import { MilestonesCard } from './MilestonesCard';
@@ -68,6 +69,11 @@ export function DashboardPage({ api, today = new Date() }: DashboardPageProps) {
       {summary.state === 'loading' && <Skeleton height={150} />}
       {summary.state === 'error' && <ErrorNote message={summary.message} />}
       {summary.state === 'ready' && <StreakHero streakDays={summary.value.streakDays} />}
+
+      {/* Between the streak and the milestone ladder on purpose: the streak states one
+          unforgiving fact and this states a forgiving one, so a missed day shows as lost
+          ground rather than erased progress. */}
+      <GoalsProgressCard api={api} />
 
       <MilestonesCard api={api} />
 
