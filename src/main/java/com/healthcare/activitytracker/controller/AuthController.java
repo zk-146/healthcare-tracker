@@ -1,10 +1,14 @@
 package com.healthcare.activitytracker.controller;
 
 import com.healthcare.activitytracker.model.dto.AuthResponse;
+import com.healthcare.activitytracker.model.dto.ForgotPasswordRequest;
 import com.healthcare.activitytracker.model.dto.LoginRequest;
 import com.healthcare.activitytracker.model.dto.PasswordChangeRequest;
 import com.healthcare.activitytracker.model.dto.RefreshRequest;
 import com.healthcare.activitytracker.model.dto.RegisterRequest;
+import com.healthcare.activitytracker.model.dto.ResetPasswordRequest;
+import com.healthcare.activitytracker.model.dto.VerifyEmailRequest;
+import com.healthcare.activitytracker.service.AccountRecoveryService;
 import com.healthcare.activitytracker.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,9 +27,11 @@ public class AuthController {
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final AuthService authService;
+  private final AccountRecoveryService accountRecoveryService;
 
-  public AuthController(AuthService authService) {
+  public AuthController(AuthService authService, AccountRecoveryService accountRecoveryService) {
     this.authService = authService;
+    this.accountRecoveryService = accountRecoveryService;
   }
 
   /** Registers a new user and returns access and refresh tokens. Returns 201 on success. */
@@ -63,6 +69,42 @@ public class AuthController {
     UUID userId = (UUID) auth.getPrincipal();
     authService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword());
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Emails a password-reset link if the address has an account. Always answers 202 with no body,
+   * whether or not it does, so the response cannot be used to find out which addresses are
+   * registered.
+   */
+  @Operation(summary = "Request a password-reset email")
+  @PostMapping("/forgot-password")
+  public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    accountRecoveryService.requestPasswordReset(request.getEmail());
+    return ResponseEntity.accepted().build();
+  }
+
+  /** Sets a new password using the token from a reset email. Revokes all refresh tokens. */
+  @Operation(summary = "Set a new password using an emailed reset token")
+  @PostMapping("/reset-password")
+  public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    accountRecoveryService.resetPassword(request.getToken(), request.getNewPassword());
+    return ResponseEntity.noContent().build();
+  }
+
+  /** Confirms an email address using the token from a verification email. */
+  @Operation(summary = "Confirm an email address using an emailed token")
+  @PostMapping("/verify-email")
+  public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+    accountRecoveryService.verifyEmail(request.getToken());
+    return ResponseEntity.noContent().build();
+  }
+
+  /** Sends the authenticated user a fresh verification email. */
+  @Operation(summary = "Resend the email-verification message to the current user")
+  @PostMapping("/resend-verification")
+  public ResponseEntity<Void> resendVerification(Authentication auth) {
+    accountRecoveryService.resendVerification((UUID) auth.getPrincipal());
+    return ResponseEntity.accepted().build();
   }
 
   /**

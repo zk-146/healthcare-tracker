@@ -72,6 +72,24 @@ spring:
       ack-mode: record
       missing-topics-fatal: false
 
+  # SMTP connection for account emails (password reset, email verification). Only used when
+  # app.mail.enabled is true; any SMTP provider works.
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS:true}
+          # Without these a stalled mail server ties up a sender thread indefinitely.
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
+
   servlet:
     multipart:
       # Large enough for a Kaggle Fitbit dailyActivity_merged.csv export (single-digit MB).
@@ -85,15 +103,43 @@ server:
     max-http-form-post-size: 20MB
     max-swallow-size: 20MB
 
-# Only expose the health endpoint; all others are disabled by default
+# Exposed actuator endpoints: health (public) and prometheus (metrics). SecurityConfig only
+# serves /actuator/prometheus on a dedicated management port (MANAGEMENT_PORT), so with the
+# default single port below metrics are enabled but unreachable -- never public by accident.
 management:
+  server:
+    # Unset = same port as the application. Set to a port that is NOT published outside the
+    # host/cluster to make health and metrics available to the orchestrator and Prometheus.
+    port: ${MANAGEMENT_PORT:}
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+      # /actuator/health/liveness and /actuator/health/readiness for orchestrator probes.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          # PostgreSQL is the only hard dependency: without it no request can be served.
+          include: readinessState,db
+  health:
+    # Redis and SMTP are optional by design (in-memory fallback; mail can be off), so their
+    # auto-configured indicators must not mark a working instance DOWN -- an orchestrator
+    # would restart healthy instances during an outage of something they do not need.
+    redis:
+      enabled: false
+    mail:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # Histogram buckets for request latency, so p95/p99 can be computed in Prometheus.
+      percentiles-histogram:
+        http.server.requests: true
 
 logging:
   level:
@@ -126,6 +172,16 @@ app:
       # the account being attacked instead. Distributed via Redis when it is available.
       max-attempts: ${LOGIN_MAX_ATTEMPTS:10}
       lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
+  mail:
+    # Off by default so the app runs with no mail server. While off, password-reset and
+    # verification emails are not delivered (a warning is logged at startup).
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@localhost}
+    # Externally reachable origin of this deployment; links in emails are built on it.
+    public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+    reset-token-minutes: 30
+    verification-token-hours: 24
+    resend-cooldown-seconds: 60
   summary:
     max-range-days: 365
   ai:

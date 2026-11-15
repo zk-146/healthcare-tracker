@@ -13,7 +13,7 @@
 
     <groupId>com.healthcare</groupId>
     <artifactId>activity-tracker</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>activity-tracker</name>
     <description>Healthcare Activity Tracking System</description>
 
@@ -171,6 +171,18 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Metrics in Prometheus format at /actuator/prometheus (management port only). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- SMTP delivery for password-reset and email-verification messages. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- CSV import (bulk-loading external exports, e.g. Kaggle Fitbit datasets) -->

@@ -1,10 +1,12 @@
 package com.healthcare.activitytracker.config;
 
 import com.healthcare.activitytracker.filter.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -26,8 +28,11 @@ public class SecurityConfig {
   @Value("${app.cors.allowed-origins:http://localhost:3000}")
   private String allowedOrigins;
 
-  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+  private final Environment environment;
+
+  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, Environment environment) {
     this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    this.environment = environment;
   }
 
   @Bean
@@ -63,7 +68,13 @@ public class SecurityConfig {
                         "/api/v1/auth/register",
                         "/api/v1/auth/login",
                         "/api/v1/auth/refresh",
-                        "/api/v1/auth/logout")
+                        "/api/v1/auth/logout",
+                        // Account recovery: by definition the caller cannot log in. Each is
+                        // authorised by a single-use emailed token, or (forgot-password) does
+                        // nothing visible to the caller at all.
+                        "/api/v1/auth/forgot-password",
+                        "/api/v1/auth/reset-password",
+                        "/api/v1/auth/verify-email")
                     .permitAll()
                     // OAuth redirect target: Google sends the browser here with no JWT, so it
                     // cannot require authentication. It is secured instead by the one-time state.
@@ -77,9 +88,17 @@ public class SecurityConfig {
                     // where these paths return 404
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()
-                    // Only /actuator/health is public; all other actuator endpoints require
-                    // authentication
-                    .requestMatchers("/actuator/health")
+                    // Health (and its liveness/readiness probes) is public; it reports status
+                    // only, never details.
+                    .requestMatchers(
+                        "/actuator/health",
+                        "/actuator/health/liveness",
+                        "/actuator/health/readiness")
+                    .permitAll()
+                    // Metrics are served only over a dedicated management port, which is not
+                    // published to the outside. On the application port this does not match
+                    // and the denyAll below applies.
+                    .requestMatchers(this::isMetricsScrapeOnManagementPort)
                     .permitAll()
                     .requestMatchers("/actuator/**")
                     .denyAll()
@@ -96,6 +115,30 @@ public class SecurityConfig {
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
+  }
+
+  /**
+   * True for {@code GET /actuator/prometheus} arriving on a management port that is separate from
+   * the application port.
+   *
+   * <p>Metrics carry no credentials of their own, so reachability is the access control: the
+   * management port is bound for the orchestrator and Prometheus and is never published. When no
+   * separate port is configured ({@code MANAGEMENT_PORT} unset) there is nothing to tell a scrape
+   * from a request off the internet, so this never matches and metrics stay closed.
+   *
+   * <p>The ports are read per request from the {@code local.*.port} properties Boot publishes once
+   * each web server has started, rather than from configuration, so a configured port of 0 (random,
+   * as in tests) resolves to the port actually bound.
+   */
+  private boolean isMetricsScrapeOnManagementPort(HttpServletRequest request) {
+    if (!"/actuator/prometheus".equals(request.getRequestURI())) {
+      return false;
+    }
+    Integer managementPort = environment.getProperty("local.management.port", Integer.class);
+    Integer serverPort = environment.getProperty("local.server.port", Integer.class);
+    return managementPort != null
+        && !managementPort.equals(serverPort)
+        && request.getLocalPort() == managementPort;
   }
 
   @Bean

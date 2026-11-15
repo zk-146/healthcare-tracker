@@ -33,6 +33,7 @@ class AuthServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private RefreshTokenRepository refreshTokenRepository;
   @Mock private TokenBlacklistService tokenBlacklistService;
+  @Mock private AccountRecoveryService accountRecoveryService;
 
   private PasswordEncoder passwordEncoder;
   private JwtUtil jwtUtil;
@@ -62,7 +63,8 @@ class AuthServiceTest {
             passwordEncoder,
             jwtUtil,
             tokenBlacklistService,
-            loginAttemptService);
+            loginAttemptService,
+            accountRecoveryService);
   }
 
   @Test
@@ -92,6 +94,7 @@ class AuthServiceTest {
     AuthResponse response = authService.register(request);
 
     assertThat(response.getToken()).isNotBlank();
+    verify(accountRecoveryService).sendVerificationEmail(any(User.class));
     assertThat(response.getRefreshToken()).isNotBlank();
     assertThat(response.getEmail()).isEqualTo("new@example.com");
   }

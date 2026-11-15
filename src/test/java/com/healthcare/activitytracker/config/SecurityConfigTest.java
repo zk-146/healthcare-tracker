@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.healthcare.activitytracker.controller.AuthController;
+import com.healthcare.activitytracker.service.AccountRecoveryService;
 import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
@@ -25,6 +26,7 @@ class SecurityConfigTest {
   @Autowired MockMvc mockMvc;
 
   @MockBean AuthService authService;
+  @MockBean AccountRecoveryService accountRecoveryService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
