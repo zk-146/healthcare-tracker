@@ -7,6 +7,7 @@ const now = new Date(2026, 8, 8, 10, 0); // 2026-09-08T10:00 local
 const profile: ProfileResponse = {
   id: 'u1',
   email: 'ada@example.com',
+  emailVerified: true,
   fullName: 'Ada Lovelace',
   dateOfBirth: '1990-01-01',
   gender: 'female',

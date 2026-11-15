@@ -10,6 +10,7 @@ import { ErrorNote } from '../ui/ErrorNote';
 import { Skeleton } from '../ui/Skeleton';
 import { AiSettingsCard } from './AiSettingsCard';
 import { ChangePasswordCard } from './ChangePasswordCard';
+import { EmailVerificationNote } from './EmailVerificationNote';
 import {
   dateOfBirthError,
   draftFrom,
@@ -164,6 +165,7 @@ function ProfileForm({
       <Card title="Profile">
         <form onSubmit={(event) => void handleSubmit(event)} noValidate>
           <p className="profile-email">{current.email}</p>
+          <EmailVerificationNote api={api} verified={current.emailVerified} />
 
           {banner !== null && <ErrorNote message={banner} />}
           {saved && banner === null && <p className="saved-note">Saved.</p>}

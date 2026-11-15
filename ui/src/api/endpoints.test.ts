@@ -21,9 +21,13 @@ import {
   listAllActivities,
   login,
   register,
+  requestPasswordReset,
+  resendVerification,
+  resetPassword,
   saveDeepSeekApiKey,
   updateActivity,
   updateProfile,
+  verifyEmail,
 } from './endpoints';
 import type { ActivityInput, ActivityResponse, AuthResponse, ProfileResponse } from './types';
 
@@ -295,9 +299,62 @@ describe('unauthenticated auth endpoints', () => {
   });
 });
 
+describe('account recovery endpoints', () => {
+  it('asks for a reset email without a bearer token and resolves with nothing', async () => {
+    const fetchImpl = fetchStub(202, null);
+
+    const result = await requestPasswordReset('ada@example.com', fetchImpl as unknown as typeof fetch);
+
+    expect(result).toBeUndefined();
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/forgot-password');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ email: 'ada@example.com' });
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('posts the emailed token with the new password', async () => {
+    const fetchImpl = fetchStub(204, null);
+
+    await resetPassword('tok', 'NewP@ssword456', fetchImpl as unknown as typeof fetch);
+
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/reset-password');
+    expect(JSON.parse(init.body as string)).toEqual({ token: 'tok', newPassword: 'NewP@ssword456' });
+  });
+
+  it('rejects with the server message when a reset link is no longer valid', async () => {
+    const fetchImpl = fetchStub(400, { error: 'This link is invalid or has expired.' });
+
+    await expect(
+      resetPassword('tok', 'NewP@ssword456', fetchImpl as unknown as typeof fetch),
+    ).rejects.toMatchObject({ status: 400, body: { error: 'This link is invalid or has expired.' } });
+  });
+
+  it('posts the emailed token to confirm an address', async () => {
+    const fetchImpl = fetchStub(204, null);
+
+    await verifyEmail('tok', fetchImpl as unknown as typeof fetch);
+
+    const [path, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe('/api/v1/auth/verify-email');
+    expect(JSON.parse(init.body as string)).toEqual({ token: 'tok' });
+  });
+
+  it('resends the verification email through the authenticated client', async () => {
+    const post = vi.fn().mockResolvedValue(undefined);
+    const api = { post } as unknown as ApiClient;
+
+    await resendVerification(api);
+
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/resend-verification');
+  });
+});
+
 const profile: ProfileResponse = {
   id: 'u1',
   email: 'ada@example.com',
+  emailVerified: true,
   fullName: 'Ada Lovelace',
   dateOfBirth: '1990-01-01',
   gender: 'female',

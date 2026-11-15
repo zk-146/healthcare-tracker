@@ -6,7 +6,7 @@ import { LoginPage } from './LoginPage';
 describe('LoginPage', () => {
   it('submits the entered credentials', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} />);
+    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} onForgotPassword={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'z@example.com');
     await userEvent.type(screen.getByLabelText(/password/i), 'hunter2');
@@ -17,7 +17,7 @@ describe('LoginPage', () => {
 
   it('shows an error message when sign-in is rejected', async () => {
     const onSubmit = vi.fn().mockRejectedValue(new Error('Invalid credentials'));
-    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} />);
+    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} onForgotPassword={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'z@example.com');
     await userEvent.type(screen.getByLabelText(/password/i), 'wrong');
@@ -31,7 +31,7 @@ describe('LoginPage', () => {
   it('disables the button while the request is in flight', async () => {
     let resolve: () => void = () => {};
     const onSubmit = vi.fn().mockReturnValue(new Promise<void>((r) => { resolve = r; }));
-    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} />);
+    render(<LoginPage onSubmit={onSubmit} onSwitchToRegister={vi.fn()} onForgotPassword={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/email/i), 'z@example.com');
     await userEvent.type(screen.getByLabelText(/password/i), 'hunter2');
@@ -43,10 +43,27 @@ describe('LoginPage', () => {
 
   it('lets the user switch to the registration form', async () => {
     const onSwitchToRegister = vi.fn();
-    render(<LoginPage onSubmit={vi.fn()} onSwitchToRegister={onSwitchToRegister} />);
+    render(
+      <LoginPage
+        onSubmit={vi.fn()}
+        onSwitchToRegister={onSwitchToRegister}
+        onForgotPassword={vi.fn()}
+      />,
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /create an account/i }));
 
     expect(onSwitchToRegister).toHaveBeenCalled();
+  });
+
+  it('lets the user start a password reset', async () => {
+    const onForgotPassword = vi.fn();
+    render(
+      <LoginPage onSubmit={vi.fn()} onSwitchToRegister={vi.fn()} onForgotPassword={onForgotPassword} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /forgot your password/i }));
+
+    expect(onForgotPassword).toHaveBeenCalled();
   });
 });

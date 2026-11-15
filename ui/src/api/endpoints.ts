@@ -103,12 +103,15 @@ export function disconnectDeepSeek(api: ApiClient): Promise<void> {
   return api.del<void>('/api/v1/integrations/deepseek');
 }
 
-/** Shared by login and register — neither has a token yet, so both bypass the ApiClient. */
-async function unauthenticatedPost(
+/**
+ * Shared by every call made before a token exists (login, register, account recovery),
+ * all of which bypass the ApiClient. Resolves with the raw Response on success.
+ */
+async function unauthenticatedSend(
   path: string,
   body: unknown,
   fetchImpl: typeof fetch,
-): Promise<AuthResponse> {
+): Promise<Response> {
   // Global constraint: every API call sends X-User-Timezone, including pre-auth calls.
   // Do not simplify this back to a bare Content-Type header.
   const response = await fetchImpl(path, {
@@ -128,7 +131,49 @@ async function unauthenticatedPost(
     }
     throw new ApiError(response.status, errorBody);
   }
+  return response;
+}
+
+/** For login and register, which answer with a token pair. */
+async function unauthenticatedPost(
+  path: string,
+  body: unknown,
+  fetchImpl: typeof fetch,
+): Promise<AuthResponse> {
+  const response = await unauthenticatedSend(path, body, fetchImpl);
   return (await response.json()) as AuthResponse;
+}
+
+/**
+ * Asks for a password-reset email. Resolves the same way whether or not the address has
+ * an account — the server deliberately does not say — so callers must not present
+ * success as "an email was sent".
+ */
+export async function requestPasswordReset(
+  email: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  await unauthenticatedSend('/api/v1/auth/forgot-password', { email }, fetchImpl);
+}
+
+/** Sets a new password using the token from a reset email. Rejects with a 400 ApiError
+ *  when the link is invalid, used or expired, or the password is too weak. */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  await unauthenticatedSend('/api/v1/auth/reset-password', { token, newPassword }, fetchImpl);
+}
+
+/** Confirms an email address using the token from a verification email. */
+export async function verifyEmail(token: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+  await unauthenticatedSend('/api/v1/auth/verify-email', { token }, fetchImpl);
+}
+
+/** Sends the signed-in user a fresh verification email. */
+export async function resendVerification(api: ApiClient): Promise<void> {
+  await api.post<void>('/api/v1/auth/resend-verification');
 }
 
 /** Login runs before any token exists, so it bypasses the authenticated client. */

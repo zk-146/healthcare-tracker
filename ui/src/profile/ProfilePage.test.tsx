@@ -9,6 +9,7 @@ import { ProfilePage } from './ProfilePage';
 const profile: ProfileResponse = {
   id: 'u1',
   email: 'ada@example.com',
+  emailVerified: true,
   fullName: 'Ada Lovelace',
   dateOfBirth: '1990-01-01',
   gender: 'female',
