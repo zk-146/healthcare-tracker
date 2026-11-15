@@ -45,7 +45,8 @@ public class GoogleHealthProperties {
 
   /**
    * The token-encryption key that ships in this repository. {@code StartupSecretValidator} refuses
-   * to start the {@code prod} profile with this value once the integration is enabled.
+   * to start the {@code prod} profile with this value, even with this integration disabled: the
+   * same key encrypts users' DeepSeek API keys.
    */
   public static final String DEFAULT_TOKEN_ENCRYPTION_KEY = "change-me-token-encryption-key";
 

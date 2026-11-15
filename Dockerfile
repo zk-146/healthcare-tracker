@@ -7,7 +7,9 @@ COPY ui/ ./
 RUN npm run build
 
 # Backend build stage
-FROM maven:3.9.15-eclipse-temurin-26 AS builder
+# Java 17 in both stages below: it is what pom.xml targets and what CI runs the test suite
+# on, so the image ships on the runtime the tests actually exercised. Move all three together.
+FROM maven:3.9.15-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline -q
@@ -17,7 +19,7 @@ COPY --from=ui /ui/dist ./src/main/resources/static
 RUN mvn package -Dmaven.test.skip=true -q
 
 # Run stage
-FROM eclipse-temurin:25-jre-jammy
+FROM eclipse-temurin:17-jre-jammy
 RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app
 WORKDIR /app
 COPY --from=builder /app/target/activity-tracker-0.0.1-SNAPSHOT.jar app.jar

@@ -41,7 +41,7 @@ class StartupSecretValidatorTest {
                 run(
                     ACCESS_SECRET,
                     REFRESH_SECRET,
-                    googleHealth(false, GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY),
+                    googleHealth(false, "a-real-token-encryption-key"),
                     "prod"))
         .doesNotThrowAnyException();
   }
@@ -80,16 +80,22 @@ class StartupSecretValidatorTest {
         .hasMessageContaining("GOOGLE_HEALTH_TOKEN_KEY");
   }
 
+  /**
+   * The same key encrypts users' DeepSeek API keys, and the endpoint that stores one is live
+   * whatever the Google Health switch says — so the switch being off does not make the shipped
+   * default safe.
+   */
   @Test
-  void allowsDefaultGoogleTokenKeyInProdWhenIntegrationDisabled() {
-    assertThatCode(
+  void rejectsDefaultTokenKeyInProdEvenWhenGoogleHealthDisabled() {
+    assertThatThrownBy(
             () ->
                 run(
                     ACCESS_SECRET,
                     REFRESH_SECRET,
                     googleHealth(false, GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY),
                     "prod"))
-        .doesNotThrowAnyException();
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("GOOGLE_HEALTH_TOKEN_KEY");
   }
 
   @Test

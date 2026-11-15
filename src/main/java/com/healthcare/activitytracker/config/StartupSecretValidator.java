@@ -15,9 +15,10 @@ import org.springframework.stereotype.Component;
  * everywhere else.
  *
  * <p>Covers every secret the application derives a key from — the two JWT signing secrets and the
- * passphrase that encrypts stored Google OAuth tokens at rest — and rejects three ways they go
- * wrong: a value that ships in this repository, access and refresh secrets that are identical, and
- * a secret long enough to satisfy the algorithm but made of padding.
+ * passphrase that encrypts stored Google OAuth tokens and users' DeepSeek API keys at rest — and
+ * rejects three ways they go wrong: a value that ships in this repository, access and refresh
+ * secrets that are identical, and a secret long enough to satisfy the algorithm but made of
+ * padding.
  */
 @Component
 public class StartupSecretValidator implements ApplicationRunner {
@@ -73,7 +74,7 @@ public class StartupSecretValidator implements ApplicationRunner {
     validateSecretVariety(isProduction, "JWT_SECRET", jwtSecret);
     validateSecretVariety(isProduction, "JWT_REFRESH_SECRET", jwtRefreshSecret);
 
-    validateGoogleHealthTokenKey(isProduction);
+    validateTokenEncryptionKey(isProduction);
   }
 
   /**
@@ -98,21 +99,23 @@ public class StartupSecretValidator implements ApplicationRunner {
   }
 
   /**
-   * The Google OAuth token-encryption passphrase only matters when the integration is switched on —
-   * with {@code enabled=false} nothing is ever encrypted with it, so the shipped default stays
-   * harmless and must not block startup.
+   * Refuses the token-encryption key that ships in this repository, whether or not the Google
+   * Health integration is switched on.
+   *
+   * <p>The property lives under {@code google-health} for historical reasons, but {@code
+   * TokenCipher} is also what encrypts each user's own DeepSeek API key, and the endpoint that
+   * stores one is reachable regardless of {@code app.ai.provider} or the Google Health switch. A
+   * check gated on that switch therefore let a production deployment store those keys under a
+   * passphrase anyone can read here.
    */
-  private void validateGoogleHealthTokenKey(boolean isProduction) {
-    if (!googleHealthProperties.isEnabled()) {
-      return;
-    }
+  private void validateTokenEncryptionKey(boolean isProduction) {
     if (GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY.equals(
         googleHealthProperties.getTokenEncryptionKey())) {
       failOrWarn(
           isProduction,
-          "The Google Health integration is enabled but its token-encryption key is still the "
-              + "default that ships in this repository, so stored OAuth tokens are effectively "
-              + "unencrypted. Set GOOGLE_HEALTH_TOKEN_KEY.");
+          "The token-encryption key is still the default that ships in this repository, so "
+              + "stored Google OAuth tokens and users' DeepSeek API keys are effectively "
+              + "unencrypted. Set GOOGLE_HEALTH_TOKEN_KEY, e.g. openssl rand -base64 32.");
     }
   }
 

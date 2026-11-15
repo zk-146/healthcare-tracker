@@ -35,3 +35,8 @@ app:
   rate-limit:
     auth-requests-per-minute: 10
     api-requests-per-minute: 60
+  integrations:
+    google-health:
+      # Required even when the Google Health integration is off: this key also encrypts
+      # users' DeepSeek API keys. No default, like the JWT secrets above.
+      token-encryption-key: ${GOOGLE_HEALTH_TOKEN_KEY}
