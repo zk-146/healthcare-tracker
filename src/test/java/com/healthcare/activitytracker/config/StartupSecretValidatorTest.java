@@ -98,6 +98,32 @@ class StartupSecretValidatorTest {
         .hasMessageContaining("GOOGLE_HEALTH_TOKEN_KEY");
   }
 
+  /**
+   * Boot binds {@code @ConfigurationProperties} leniently: a {@code ${VAR}} with no value and no
+   * default is not an error, it is passed through as that literal text. So "no default" in YAML
+   * does not make a variable required — an unset one arrives here looking like this, and would
+   * otherwise be used as the key.
+   */
+  @Test
+  void rejectsAnUnresolvedPlaceholderAsTheTokenKeyInProd() {
+    assertThatThrownBy(
+            () ->
+                run(
+                    ACCESS_SECRET,
+                    REFRESH_SECRET,
+                    googleHealth(false, "${GOOGLE_HEALTH_TOKEN_KEY}"),
+                    "prod"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("GOOGLE_HEALTH_TOKEN_KEY");
+  }
+
+  @Test
+  void rejectsABlankTokenKeyInProd() {
+    assertThatThrownBy(() -> run(ACCESS_SECRET, REFRESH_SECRET, googleHealth(false, "  "), "prod"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("GOOGLE_HEALTH_TOKEN_KEY");
+  }
+
   @Test
   void allowsRealGoogleTokenKeyInProdWhenIntegrationEnabled() {
     assertThatCode(

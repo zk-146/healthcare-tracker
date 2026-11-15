@@ -109,13 +109,24 @@ public class StartupSecretValidator implements ApplicationRunner {
    * passphrase anyone can read here.
    */
   private void validateTokenEncryptionKey(boolean isProduction) {
-    if (GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY.equals(
-        googleHealthProperties.getTokenEncryptionKey())) {
+    String key = googleHealthProperties.getTokenEncryptionKey();
+    if (GoogleHealthProperties.DEFAULT_TOKEN_ENCRYPTION_KEY.equals(key)) {
       failOrWarn(
           isProduction,
           "The token-encryption key is still the default that ships in this repository, so "
               + "stored Google OAuth tokens and users' DeepSeek API keys are effectively "
               + "unencrypted. Set GOOGLE_HEALTH_TOKEN_KEY, e.g. openssl rand -base64 32.");
+      return;
+    }
+    // Unlike @Value (used for the JWT secrets), @ConfigurationProperties binding does not fail
+    // on a ${VAR} that has no value: it hands over the placeholder text itself. Without this
+    // check an unset variable would become the key, which is no more secret than the default.
+    if (key == null || key.isBlank() || key.contains("${")) {
+      failOrWarn(
+          isProduction,
+          "The token-encryption key is not set, so stored Google OAuth tokens and users' "
+              + "DeepSeek API keys would be encrypted with a value anyone can guess. Set "
+              + "GOOGLE_HEALTH_TOKEN_KEY, e.g. openssl rand -base64 32.");
     }
   }
 

@@ -35,8 +35,7 @@ app:
   rate-limit:
     auth-requests-per-minute: 10
     api-requests-per-minute: 60
-  integrations:
-    google-health:
-      # Required even when the Google Health integration is off: this key also encrypts
-      # users' DeepSeek API keys. No default, like the JWT secrets above.
-      token-encryption-key: ${GOOGLE_HEALTH_TOKEN_KEY}
+  # GOOGLE_HEALTH_TOKEN_KEY is also required in this profile, even with the Google Health
+  # integration off: the same key encrypts users' DeepSeek API keys. It is enforced by
+  # StartupSecretValidator rather than by a default-less placeholder here, because for that
+  # property Spring would pass an unset ${VAR} through as literal text instead of failing.
