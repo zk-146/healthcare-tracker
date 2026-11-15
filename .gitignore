@@ -121,3 +121,4 @@ src/main/resources/static/
 .scannerwork/
 .sonar/
 ui/coverage/
+backups/

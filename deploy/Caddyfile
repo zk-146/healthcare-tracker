@@ -1,0 +1,14 @@
+# TLS termination in front of the app. Caddy obtains and renews a certificate for
+# {$DOMAIN} automatically, and redirects http:// to https://.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The app sets HSTS itself, but only on requests it sees as HTTPS, and behind this
+	# proxy it sees plain HTTP. Set it here instead. No "preload": that is a one-way
+	# commitment for the whole domain and should be a deliberate decision.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Only the application port. The management port (9090: health, metrics) is
+	# deliberately not proxied, so /actuator/prometheus is unreachable from outside.
+	reverse_proxy app:8080
+}

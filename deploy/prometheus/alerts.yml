@@ -1,0 +1,73 @@
+groups:
+  - name: activity-tracker
+    rules:
+      - alert: AppDown
+        expr: up{job="activity-tracker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Activity Tracker is not answering scrapes
+          description: >-
+            Prometheus has been unable to scrape the app's management port for 2 minutes.
+            The app is down, restarting in a loop, or failing its readiness check.
+
+      - alert: HighServerErrorRate
+        expr: >-
+          sum(rate(http_server_requests_seconds_count{job="activity-tracker", status=~"5.."}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{job="activity-tracker"}[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of requests are failing with a 5xx
+          description: Check the app logs for the request IDs of the failing calls.
+
+      - alert: SlowRequests
+        expr: >-
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="activity-tracker", uri!~"/api/v1/summary/digest|/api/v1/activities/.*/insights"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 95th-percentile request latency is above 1 second
+          description: >-
+            Excludes the AI digest and insight endpoints, which wait on a language model
+            and are slow by nature.
+
+      - alert: DatabasePoolSaturated
+        expr: hikaricp_connections_pending{job="activity-tracker"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Requests are queueing for a database connection
+          description: The connection pool has had waiters for 5 minutes. Look for slow queries or a stuck transaction.
+
+      - alert: HeapNearlyFull
+        expr: >-
+          sum(jvm_memory_used_bytes{job="activity-tracker", area="heap"})
+          /
+          sum(jvm_memory_max_bytes{job="activity-tracker", area="heap"})
+          > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: JVM heap has been above 90% for 10 minutes
+          description: Raise APP_MEMORY_LIMIT or investigate a leak before the container is OOM-killed.
+
+      - alert: LoginRateLimiting
+        expr: sum(rate(http_server_requests_seconds_count{job="activity-tracker", status="429"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sustained 429 responses
+          description: >-
+            Either someone is hammering the API, or TRUSTED_PROXIES no longer matches the
+            proxy's address and every client is sharing one rate-limit bucket.
