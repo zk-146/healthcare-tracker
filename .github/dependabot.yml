@@ -37,6 +37,18 @@ updates:
       - dependency-name: "eclipse-temurin"
         update-types: ["version-update:semver-major"]
 
+  # Images referenced from the compose files (dev stack and deploy/). Pinned to exact
+  # tags there, so something has to move them.
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "/"
+      - "/deploy"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+
   # The Actions used by our own CI/CD workflows
   - package-ecosystem: "github-actions"
     directory: "/"

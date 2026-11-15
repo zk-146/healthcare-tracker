@@ -22,7 +22,9 @@ RUN mvn package -Dmaven.test.skip=true -q
 FROM eclipse-temurin:17-jre-jammy
 RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app
 WORKDIR /app
-COPY --from=builder /app/target/activity-tracker-0.0.1-SNAPSHOT.jar app.jar
+# Wildcard so a version bump in pom.xml does not also have to be made here. It matches
+# exactly one file: the repackaged jar (the plain one is renamed to *.jar.original).
+COPY --from=builder /app/target/activity-tracker-*.jar app.jar
 RUN chown -R app:app /app
 USER app
 EXPOSE 8080
