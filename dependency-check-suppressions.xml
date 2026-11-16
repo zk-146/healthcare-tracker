@@ -23,7 +23,9 @@
 
         Nothing else is suppressed here. The swagger-ui DOMPurify CVEs, CVE-2026-65898
         among them, used to need an entry; they are fixed properly now by pinning
-        org.webjars:swagger-ui to 5.32.14 in pom.xml, which bundles DOMPurify 3.4.13.
+        org.webjars:swagger-ui in pom.xml to a release that bundles a patched DOMPurify
+        (currently 5.35.0 / DOMPurify 3.4.17). When a new DOMPurify CVE trips the gate,
+        move that pin forward rather than adding an entry here.
     -->
 
     <!-- ===== Spring Framework 6.2.19 (OSS fix only in 7.0.9 / Spring Boot 4.x) ===== -->
@@ -179,5 +181,20 @@
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
         <cve>CVE-2026-59270</cve>
+    </suppress>
+
+    <suppress until="2026-12-31Z">
+        <notes><![CDATA[
+            DPoP proof replay: DPoPProofJwtDecoderFactory's jti cache can be flooded to evict
+            an entry, letting an intercepted DPoP proof be replayed (CVSS 7.4; fixed in 6.5.12,
+            Enterprise Support only). That class lives in spring-security-oauth2-resource-server,
+            which is not on the dependency tree: the packaged jar ships only
+            spring-security-core, -config, -web and -crypto. The application is not an OAuth2
+            resource server and uses no DPoP; it validates its own JWTs with jjwt in
+            JwtAuthenticationFilter. dependency-check reports the CVE here only because it
+            attaches the Spring Security CPE to every jar in the release train.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.security/spring-security-.*@.*$</packageUrl>
+        <cve>CVE-2026-41707</cve>
     </suppress>
 </suppressions>
