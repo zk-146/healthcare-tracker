@@ -103,6 +103,15 @@ server:
     max-http-form-post-size: 20MB
     max-swallow-size: 20MB
 
+springdoc:
+  swagger-ui:
+    # pom.xml pins the swagger-ui webjar to a newer release than springdoc bundles (for the
+    # DOMPurify fixes). springdoc serves the UI from /webjars/swagger-ui/<version>/ and
+    # otherwise assumes its own bundled version, so without this every UI asset is a 404.
+    # Filled in from the pom's swagger-ui.version property at build time, so the two
+    # cannot drift apart.
+    version: "@swagger-ui.version@"
+
 # Exposed actuator endpoints: health (public) and prometheus (metrics). SecurityConfig only
 # serves /actuator/prometheus on a dedicated management port (MANAGEMENT_PORT), so with the
 # default single port below metrics are enabled but unreachable -- never public by accident.
