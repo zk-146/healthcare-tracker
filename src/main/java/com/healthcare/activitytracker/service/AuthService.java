@@ -39,6 +39,7 @@ public class AuthService {
   private final JwtUtil jwtUtil;
   private final TokenBlacklistService tokenBlacklistService;
   private final LoginAttemptService loginAttemptService;
+  private final AccountRecoveryService accountRecoveryService;
 
   public AuthService(
       UserRepository userRepository,
@@ -46,13 +47,15 @@ public class AuthService {
       PasswordEncoder passwordEncoder,
       JwtUtil jwtUtil,
       TokenBlacklistService tokenBlacklistService,
-      LoginAttemptService loginAttemptService) {
+      LoginAttemptService loginAttemptService,
+      AccountRecoveryService accountRecoveryService) {
     this.userRepository = userRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtUtil = jwtUtil;
     this.tokenBlacklistService = tokenBlacklistService;
     this.loginAttemptService = loginAttemptService;
+    this.accountRecoveryService = accountRecoveryService;
   }
 
   /**
@@ -85,6 +88,9 @@ public class AuthService {
 
     user = userRepository.save(user);
     log.info("New user registered: {}", user.getId());
+
+    // Best-effort: the account works unverified, so a mail outage must not fail registration.
+    accountRecoveryService.sendVerificationEmail(user);
 
     return buildAuthResponse(user);
   }

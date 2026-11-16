@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MAVEN_IMAGE="maven:3.9-eclipse-temurin-17"
-NODE_IMAGE="node:22-alpine"
+NODE_IMAGE="node:26-alpine"
 M2_CACHE="C:/Users/Zaid/.m2"
 SONAR_URL="http://localhost:9000"
 

@@ -46,14 +46,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   /**
    * Auth endpoints that receive stricter rate-limiting protection. Includes /refresh to prevent
    * replay attacks with stolen refresh tokens and /change-password to slow down current-password
-   * brute forcing from a hijacked session.
+   * brute forcing from a hijacked session. The account-recovery endpoints are here because each one
+   * either sends mail on request or accepts a guessable-in-principle token.
    */
   private static final Set<String> AUTH_RATE_LIMITED_URIS =
       Set.of(
           "/api/v1/auth/login",
           "/api/v1/auth/register",
           "/api/v1/auth/refresh",
-          "/api/v1/auth/change-password");
+          "/api/v1/auth/change-password",
+          "/api/v1/auth/forgot-password",
+          "/api/v1/auth/reset-password",
+          "/api/v1/auth/verify-email",
+          "/api/v1/auth/resend-verification");
 
   @Value("${app.rate-limit.auth-requests-per-minute:10}")
   private int authRequestsPerMinute;

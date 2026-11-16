@@ -203,6 +203,25 @@ body {
   font-size: 14px;
 }
 
+.profile-email:has(+ .email-status) {
+  margin-bottom: 2px;
+}
+
+.email-status {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.email-status p {
+  margin: 0;
+}
+
+.email-status .link-button {
+  text-decoration: underline;
+  opacity: 1;
+}
+
 .saved-note {
   margin: 0 0 12px;
   color: var(--success, var(--muted));
@@ -244,6 +263,13 @@ body {
   border-radius: 8px;
   background: var(--accent);
   color: var(--on-accent);
+}
+
+.login-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .login button:disabled {

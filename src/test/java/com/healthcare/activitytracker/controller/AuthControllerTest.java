@@ -15,6 +15,7 @@ import com.healthcare.activitytracker.model.dto.LoginRequest;
 import com.healthcare.activitytracker.model.dto.PasswordChangeRequest;
 import com.healthcare.activitytracker.model.dto.RefreshRequest;
 import com.healthcare.activitytracker.model.dto.RegisterRequest;
+import com.healthcare.activitytracker.service.AccountRecoveryService;
 import com.healthcare.activitytracker.service.AuthService;
 import com.healthcare.activitytracker.service.TokenBlacklistService;
 import com.healthcare.activitytracker.util.JwtUtil;
@@ -40,6 +41,7 @@ class AuthControllerTest {
   @Autowired MockMvc mockMvc;
   @Autowired ObjectMapper objectMapper;
   @MockBean AuthService authService;
+  @MockBean AccountRecoveryService accountRecoveryService;
   @MockBean JwtUtil jwtUtil;
   @MockBean TokenBlacklistService tokenBlacklistService;
 
@@ -222,5 +224,93 @@ class AuthControllerTest {
         .andExpect(status().isNoContent());
 
     verify(authService).logout("garbage.token.here");
+  }
+
+  @Test
+  void forgotPassword_returns202_andIsPublic() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"user@example.com\"}"))
+        .andExpect(status().isAccepted());
+
+    verify(accountRecoveryService).requestPasswordReset("user@example.com");
+  }
+
+  @Test
+  void forgotPassword_returns400_whenEmailMalformed() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"not-an-email\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void resetPassword_returns204_onSuccess() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"abc\",\"newPassword\":\"NewP@ssword456\"}"))
+        .andExpect(status().isNoContent());
+
+    verify(accountRecoveryService).resetPassword("abc", "NewP@ssword456");
+  }
+
+  @Test
+  void resetPassword_returns400_whenPasswordTooWeak() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"abc\",\"newPassword\":\"weak\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details.newPassword").exists());
+  }
+
+  @Test
+  void resetPassword_returns400WithTheServiceMessage_whenTheLinkIsBad() throws Exception {
+    org.mockito.Mockito.doThrow(new IllegalArgumentException("This link is invalid"))
+        .when(accountRecoveryService)
+        .resetPassword(any(), any());
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"abc\",\"newPassword\":\"NewP@ssword456\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("This link is invalid"));
+  }
+
+  @Test
+  void verifyEmail_returns204_andIsPublic() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/verify-email")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"abc\"}"))
+        .andExpect(status().isNoContent());
+
+    verify(accountRecoveryService).verifyEmail("abc");
+  }
+
+  @Test
+  void resendVerification_returns202_forTheSignedInUser() throws Exception {
+    UUID userId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post("/api/v1/auth/resend-verification").with(uuidUser(userId)))
+        .andExpect(status().isAccepted());
+
+    verify(accountRecoveryService).resendVerification(userId);
+  }
+
+  @Test
+  void resendVerification_returns401_withoutASession() throws Exception {
+    mockMvc.perform(post("/api/v1/auth/resend-verification")).andExpect(status().isUnauthorized());
   }
 }

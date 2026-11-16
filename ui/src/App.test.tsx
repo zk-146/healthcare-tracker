@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
 const signOut = vi.fn().mockResolvedValue(undefined);
@@ -143,5 +143,61 @@ describe('App shell (signed out)', () => {
 
     await user.click(screen.getByRole('button', { name: /already have an account/i }));
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('opens the forgot-password form from sign-in and returns', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /forgot your password/i }));
+    expect(screen.getByRole('button', { name: /send reset link/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to sign in/i }));
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+});
+
+describe('App shell (opened from an emailed link)', () => {
+  const TOKEN = 'abcDEF123_-abcDEF123_-abcDEF123_-abcDEF1234';
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('shows the reset form for a reset link even when signed in, then drops the session', async () => {
+    isAuthenticated = true;
+    window.history.replaceState(null, '', `/#reset-password=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: /choose a new password/i })).toBeInTheDocument();
+    expect(screen.queryByText('dashboard stub')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to sign in/i }));
+
+    expect(clearSession).toHaveBeenCalled();
+    expect(window.location.hash).toBe('');
+  });
+
+  it('shows the confirmation screen for a verification link and returns to the app after', async () => {
+    isAuthenticated = true;
+    window.history.replaceState(null, '', `/#verify-email=${TOKEN}`);
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: /confirm email address/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /not now/i }));
+
+    expect(window.location.hash).toBe('');
+    expect(screen.getByText('dashboard stub')).toBeInTheDocument();
+  });
+
+  it('ignores a fragment that is not one of our links', () => {
+    isAuthenticated = true;
+    window.history.replaceState(null, '', '/#something-else');
+    render(<App />);
+
+    expect(screen.getByText('dashboard stub')).toBeInTheDocument();
   });
 });

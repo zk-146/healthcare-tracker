@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Alerts are evaluated and visible at /alerts, but go nowhere until an Alertmanager is
+# configured here with a receiver (email, Slack, PagerDuty...). See deploy/RUNBOOK.md.
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: activity-tracker
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # The app's management port. Not published; reachable only on the compose networks.
+      - targets: ["app:9090"]

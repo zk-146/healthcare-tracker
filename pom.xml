@@ -13,7 +13,7 @@
 
     <groupId>com.healthcare</groupId>
     <artifactId>activity-tracker</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>activity-tracker</name>
     <description>Healthcare Activity Tracking System</description>
 
@@ -52,9 +52,11 @@
              does nothing - springdoc pins 5.32.2 in its own dependencyManagement and that
              is what we would otherwise inherit. The dependencyManagement entry below is
              what actually moves it; the property just keeps the number in one place.
-             5.32.14 bundles DOMPurify 3.4.13, clearing the DOMPurify CVEs that the webjar
-             drags in. Drop both once springdoc ships a swagger-ui at least this new. -->
-        <swagger-ui.version>5.32.14</swagger-ui.version>
+             5.35.0 bundles DOMPurify 3.4.17, the first release with the fixes for
+             CVE-2026-116803 and CVE-2026-116804 (both CVSS 10.0; 3.4.13, which 5.32.14
+             shipped, is affected). Drop both once springdoc ships a swagger-ui at least
+             this new. -->
+        <swagger-ui.version>5.35.0</swagger-ui.version>
     </properties>
 
     <dependencyManagement>
@@ -171,6 +173,18 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Metrics in Prometheus format at /actuator/prometheus (management port only). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- SMTP delivery for password-reset and email-verification messages. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!-- CSV import (bulk-loading external exports, e.g. Kaggle Fitbit datasets) -->

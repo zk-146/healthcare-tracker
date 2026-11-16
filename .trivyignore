@@ -8,3 +8,12 @@
 # Format: one CVE (or GHSA) ID per line, optionally with a trailing comment.
 # Example:
 # CVE-2023-12345 # base-image glibc CVE, not reachable — process never parses untrusted locale data
+
+# --- Spring Framework 6.2.19: no open-source fix on the Spring Boot 3.5 line -----------
+# Both are fixed only in Spring Framework 7.0.9 (Spring Boot 4.x). They are the same two
+# CVEs, accepted on the same grounds and until the same date, as in
+# dependency-check-suppressions.xml, which records the check behind each claim. They are
+# listed here as well because Trivy rates them CRITICAL and gates on them independently.
+# Do not extend a date without re-verifying the claim.
+CVE-2026-47884 exp:2026-12-31 # XsltView RCE: needs view rendering; this app renders no views (JSON @RestControllers only, no template engine)
+CVE-2026-47890 exp:2026-12-31 # SSE stream corruption with view fragments: this app exposes no Server-Sent Events endpoints

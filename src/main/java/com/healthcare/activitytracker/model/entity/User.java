@@ -35,6 +35,14 @@ public class User {
   @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
+  /**
+   * Whether the user has proved control of {@link #email} by following an emailed link. Recorded,
+   * and shown in the profile, but deliberately not a condition of logging in.
+   */
+  @Builder.Default
+  @Column(name = "email_verified", nullable = false)
+  private boolean emailVerified = false;
+
   @Column(name = "full_name", nullable = false, length = 150)
   private String fullName;
 

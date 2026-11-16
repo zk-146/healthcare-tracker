@@ -4,6 +4,7 @@ import com.healthcare.activitytracker.exception.ResourceNotFoundException;
 import com.healthcare.activitytracker.model.dto.ProfileResponse;
 import com.healthcare.activitytracker.model.dto.ProfileUpdateRequest;
 import com.healthcare.activitytracker.model.entity.User;
+import com.healthcare.activitytracker.repository.AccountTokenRepository;
 import com.healthcare.activitytracker.repository.ActivityRepository;
 import com.healthcare.activitytracker.repository.DeepSeekConnectionRepository;
 import com.healthcare.activitytracker.repository.RefreshTokenRepository;
@@ -25,18 +26,21 @@ public class ProfileService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final StreakMilestoneRepository streakMilestoneRepository;
   private final DeepSeekConnectionRepository deepSeekConnectionRepository;
+  private final AccountTokenRepository accountTokenRepository;
 
   public ProfileService(
       UserRepository userRepository,
       ActivityRepository activityRepository,
       RefreshTokenRepository refreshTokenRepository,
       StreakMilestoneRepository streakMilestoneRepository,
-      DeepSeekConnectionRepository deepSeekConnectionRepository) {
+      DeepSeekConnectionRepository deepSeekConnectionRepository,
+      AccountTokenRepository accountTokenRepository) {
     this.userRepository = userRepository;
     this.activityRepository = activityRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.streakMilestoneRepository = streakMilestoneRepository;
     this.deepSeekConnectionRepository = deepSeekConnectionRepository;
+    this.accountTokenRepository = accountTokenRepository;
   }
 
   /**
@@ -106,6 +110,8 @@ public class ProfileService {
     // DeepSeekConnection is new as of this change, so its own FK would otherwise turn every
     // account deletion for a user with a saved key into a constraint-violation 500.
     deepSeekConnectionRepository.deleteAllByUserId(userId);
+    // Outstanding reset/verification links: same reason, their FK would block the delete.
+    accountTokenRepository.deleteAllByUserId(userId);
     userRepository.delete(user);
 
     log.info(
@@ -120,6 +126,7 @@ public class ProfileService {
     return ProfileResponse.builder()
         .id(user.getId())
         .email(user.getEmail())
+        .emailVerified(user.isEmailVerified())
         .fullName(user.getFullName())
         .dateOfBirth(user.getDateOfBirth())
         .gender(user.getGender())

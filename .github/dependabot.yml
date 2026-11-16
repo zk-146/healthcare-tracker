@@ -28,6 +28,26 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+    # The JDK major in the Dockerfile must match pom.xml's java.version and the JDK CI
+    # tests on (17). Dependabot only sees the image tag, so left alone it bumps the image
+    # to a Java release nothing was tested against. Minor/patch updates still flow.
+    ignore:
+      - dependency-name: "maven"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+
+  # Images referenced from the compose files (dev stack and deploy/). Pinned to exact
+  # tags there, so something has to move them.
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "/"
+      - "/deploy"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
 
   # The Actions used by our own CI/CD workflows
   - package-ecosystem: "github-actions"

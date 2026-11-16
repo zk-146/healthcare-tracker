@@ -124,6 +124,8 @@ export interface DigestResponse {
 export interface ProfileResponse {
   id: string;
   email: string;
+  /** Whether the user has confirmed the address by following an emailed link. */
+  emailVerified: boolean;
   fullName: string;
   /** LocalDate, "YYYY-MM-DD". */
   dateOfBirth: string | null;

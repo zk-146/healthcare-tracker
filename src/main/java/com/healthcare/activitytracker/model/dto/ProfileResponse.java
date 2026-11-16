@@ -15,6 +15,10 @@ import lombok.NoArgsConstructor;
 public class ProfileResponse {
   private UUID id;
   private String email;
+
+  /** Whether the user has confirmed the address by following an emailed link. */
+  private boolean emailVerified;
+
   private String fullName;
   private LocalDate dateOfBirth;
   private String gender;

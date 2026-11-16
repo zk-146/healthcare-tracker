@@ -18,13 +18,14 @@ jobs:
 
       # Run the OSS gitleaks CLI directly via its Docker image, rather than the
       # zricethezav/gitleaks-action wrapper, to avoid that action's licensing
-      # requirements for private repos.
+      # requirements for private repos. The image tag is pinned: a scanner that reads the
+      # whole repository history should not change underneath us on someone else's push.
       - name: Run gitleaks
         run: |
           mkdir -p gitleaks-report
           docker run --rm \
             -v "${{ github.workspace }}:/repo" \
-            zricethezav/gitleaks:latest \
+            zricethezav/gitleaks:v8.30.1 \
             detect \
               --source /repo \
               --config /repo/.gitleaks.toml \
@@ -69,10 +70,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up Node 22
+      # Same Node major as the Dockerfile's ui build stage, so the tests run on the
+      # toolchain that produces the shipped bundle.
+      - name: Set up Node 26
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '26'
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
@@ -210,12 +213,16 @@ jobs:
       - name: Build Docker image
         run: docker build -t activity-tracker:${{ github.sha }} .
 
+      # trivy-action is pinned to a commit SHA rather than a tag or @master: it runs with
+      # security-events: write, and a tag can be moved to different code after the fact.
+      # Dependabot (github-actions ecosystem) keeps the SHA and the version comment current.
+      #
       # Enforcing: fails the job on CRITICAL vulnerabilities; HIGH is reported below
       # (SARIF artifact) without failing the build. Confirmed false positives / accepted
       # findings go in .trivyignore (see that file for the format and policy) rather than
       # loosening this gate.
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: activity-tracker:${{ github.sha }}
           format: table
@@ -227,7 +234,7 @@ jobs:
       # findings are most worth having in code scanning, so the report is still produced.
       - name: Trivy SARIF report
         if: always()
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: activity-tracker:${{ github.sha }}
           format: sarif
@@ -300,16 +307,12 @@ jobs:
           JWT_SECRET: dev-secret-key-for-local-testing-must-be-at-least-32-chars
           JWT_REFRESH_SECRET: dev-refresh-secret-for-local-testing-at-least-32-chars
           # No Redis/Kafka/Ollama service in this job -- all three degrade gracefully at the
-          # application level (see application.yml comments), but Boot's default health
-          # aggregation still marks /actuator/health DOWN when Redis's auto-configured
-          # indicator can't reach it, which would otherwise fail our own readiness wait below
-          # despite the app being perfectly able to serve requests. (Kafka has no such health
-          # indicator in this actuator version -- only Redis needs disabling.) There's also
-          # no need to have Ollama or the outbox relay spin trying to reach services that
-          # don't exist here.
+          # application level (see application.yml comments), and the Redis health indicator
+          # is disabled there for the same reason, so /actuator/health stays UP without it.
+          # There's no need to have Ollama or the outbox relay spin trying to reach services
+          # that don't exist here.
           OLLAMA_ENABLED: 'false'
           OUTBOX_ENABLED: 'false'
-          MANAGEMENT_HEALTH_REDIS_ENABLED: 'false'
         run: |
           nohup java -jar target/activity-tracker-*.jar > app.log 2>&1 &
           echo "Waiting for the app to come up..."

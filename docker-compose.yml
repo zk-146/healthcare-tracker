@@ -1,3 +1,5 @@
+# Local development stack. NOT for production: default passwords, every port published,
+# plaintext everything. The production stack is deploy/docker-compose.prod.yml.
 services:
   app:
     build: .
@@ -18,6 +20,14 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-ollama}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
+      # Password-reset and verification emails are caught by mailpit (below) instead of
+      # being delivered: read them at http://localhost:8025.
+      MAIL_ENABLED: "true"
+      MAIL_FROM: activity-tracker@localhost
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,8 +86,15 @@ services:
       timeout: 5s
       retries: 5
 
+  # Catches all outbound mail; nothing leaves the machine. Web UI on :8025.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
     ports:
       - "8081:8080"
     environment:
@@ -88,7 +105,7 @@ services:
         condition: service_healthy
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.16
     # Host port 11435: a native Windows Ollama install owns 11434 on this machine.
     # Inside the compose network the app reaches this instance at http://ollama:11434.
     ports:
@@ -115,7 +132,7 @@ services:
   # so Ollama will split it across GPU+CPU (works, but slow). Set OLLAMA_MODEL=qwen2.5:7b
   # for a model that fits entirely in VRAM.
   ollama-pull:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.16
     depends_on:
       ollama:
         condition: service_healthy
